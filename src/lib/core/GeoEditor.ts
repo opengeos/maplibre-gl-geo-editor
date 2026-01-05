@@ -243,6 +243,11 @@ export class GeoEditor implements IControl {
       // Try forEach to build a map of geoman data
       let index = 0;
       this.geoman.features.forEach((fd) => {
+        // Skip if geoman data or its geoJson is undefined
+        if (!fd || !fd.geoJson || !fd.geoJson.geometry) {
+          index++;
+          return;
+        }
         const feature = fd.geoJson;
         // Use index as fallback since fd.id might be undefined
         const featureId = String(fd.id ?? feature.id ?? `feature-${index}`);
@@ -255,7 +260,8 @@ export class GeoEditor implements IControl {
     } catch {
       try {
         const fc = this.geoman.features.getAll();
-        allFeatures = fc.features;
+        // Filter out undefined/null features
+        allFeatures = (fc.features || []).filter((f) => f && f.geometry);
       } catch {
         return null;
       }
@@ -264,6 +270,12 @@ export class GeoEditor implements IControl {
     // Now check each feature
     for (let i = 0; i < allFeatures.length; i++) {
       const feature = allFeatures[i];
+      
+      // Skip undefined or null features
+      if (!feature || !feature.geometry) {
+        continue;
+      }
+      
       const featureId = String(feature.id ?? `feature-${i}`);
       // Try to get geoman data by feature id first, then by index
       const geomanData = geomanDataMap.get(featureId) || geomanDataMap.get(`idx-${i}`);
@@ -1113,7 +1125,7 @@ export class GeoEditor implements IControl {
     const snappingBtn = document.createElement('button');
     snappingBtn.className = `${CSS_PREFIX}-tool-button`;
     snappingBtn.dataset.helper = 'snapping';
-    snappingBtn.title = 'Toggle Snapping';
+    snappingBtn.title = 'Toggle Snapping (requires Geoman Pro for full functionality)';
     snappingBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M20 6h-3V4c0-1.1-.9-2-2-2H9c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM9 4h6v2H9V4zm11 16H4V8h16v12z" fill="currentColor"/><circle cx="12" cy="14" r="3" fill="currentColor"/></svg>';
 
     // Set initial state from instance property
@@ -1135,11 +1147,30 @@ export class GeoEditor implements IControl {
 
   /**
    * Toggle snapping on/off (independent of other modes)
+   * Note: Snapping functionality requires Geoman Pro. In the free version,
+   * this toggle tracks state but does not enable actual vertex snapping.
    */
   toggleSnapping(): void {
     this.snappingEnabled = !this.snappingEnabled;
-    // Geoman free doesn't have snapping API, but we keep track of the state
-    // If geoman has snapping methods, call them here
+    
+    // Attempt to set snapping if Geoman supports it (Pro version)
+    if (this.geoman) {
+      try {
+        // Try to access snapping API if available (Geoman Pro)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const gm = this.geoman as any;
+        if (typeof gm.setGlobalOptions === 'function') {
+          gm.setGlobalOptions({ snapping: this.snappingEnabled });
+        } else if (typeof gm.enableSnapping === 'function' && this.snappingEnabled) {
+          gm.enableSnapping();
+        } else if (typeof gm.disableSnapping === 'function' && !this.snappingEnabled) {
+          gm.disableSnapping();
+        }
+      } catch {
+        // Snapping API not available in this version of Geoman
+        console.info('Snapping toggle: Geoman free version does not support snapping. Consider upgrading to Geoman Pro for full snapping functionality.');
+      }
+    }
   }
 
   /**
@@ -1245,22 +1276,15 @@ export class GeoEditor implements IControl {
       }
 
       button.classList.toggle(`${CSS_PREFIX}-tool-button--active`, isActive);
-
-      // Update SVG icon colors directly via inline styles (more reliable than CSS)
+      
+      // Clear any inline styles that might conflict with CSS - let CSS handle colors
       const svg = button.querySelector('svg');
       if (svg) {
-        const color = isActive ? '#ffffff' : '#333333';
         svg.querySelectorAll('path, polygon, rect, circle, ellipse, line, text').forEach((el) => {
           const element = el as SVGElement;
-          const currentFill = element.getAttribute('fill');
-          const currentStroke = element.getAttribute('stroke');
-          // Only update if not fill="none" (preserve stroke-only elements)
-          if (currentFill !== 'none') {
-            element.style.fill = color;
-          }
-          if (currentStroke || currentFill === 'none') {
-            element.style.stroke = color;
-          }
+          // Remove inline styles to let CSS take over
+          element.style.fill = '';
+          element.style.stroke = '';
         });
       }
     });

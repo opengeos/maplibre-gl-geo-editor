@@ -127,13 +127,17 @@
   background: #ddd;
 }
 
-.geo-editor-tool-button--active {
-  background: #3388ff;
-  color: #fff;
+.geo-editor-tool-button--active,
+.geo-editor-tool-button.geo-editor-tool-button--active {
+  background: #3388ff !important;
+  background-color: #3388ff !important;
+  color: #fff !important;
 }
 
-.geo-editor-tool-button--active:hover {
-  background: #2277ee;
+.geo-editor-tool-button--active:hover,
+.geo-editor-tool-button.geo-editor-tool-button--active:hover {
+  background: #2277ee !important;
+  background-color: #2277ee !important;
 }
 
 .geo-editor-tool-button:disabled {
@@ -146,8 +150,11 @@
   height: 18px;
 }
 
-/* Active button icons - force white color */
-.geo-editor-tool-button--active svg,
+/* Active button icons - force white color with high specificity */
+.geo-editor-tool-button--active svg {
+  color: #fff !important;
+}
+
 .geo-editor-tool-button--active svg path,
 .geo-editor-tool-button--active svg polygon,
 .geo-editor-tool-button--active svg rect,
@@ -156,18 +163,29 @@
 .geo-editor-tool-button--active svg line,
 .geo-editor-tool-button--active svg text {
   fill: #fff !important;
-  stroke: #fff !important;
   color: #fff !important;
 }
 
-/* Preserve fill="none" for stroke-only elements */
-.geo-editor-tool-button--active svg [fill="none"],
+/* For stroke-only elements - stroke white, preserve fill:none */
 .geo-editor-tool-button--active svg path[fill="none"],
 .geo-editor-tool-button--active svg polygon[fill="none"],
 .geo-editor-tool-button--active svg rect[fill="none"],
 .geo-editor-tool-button--active svg circle[fill="none"],
-.geo-editor-tool-button--active svg ellipse[fill="none"] {
+.geo-editor-tool-button--active svg ellipse[fill="none"],
+.geo-editor-tool-button--active svg line[fill="none"] {
   fill: none !important;
+  stroke: #fff !important;
+}
+
+/* Elements with explicit stroke attribute */
+.geo-editor-tool-button--active svg [stroke],
+.geo-editor-tool-button--active svg path[stroke],
+.geo-editor-tool-button--active svg polygon[stroke],
+.geo-editor-tool-button--active svg rect[stroke],
+.geo-editor-tool-button--active svg circle[stroke],
+.geo-editor-tool-button--active svg ellipse[stroke],
+.geo-editor-tool-button--active svg line[stroke] {
+  stroke: #fff !important;
 }
 
 /* Tooltip styling */
