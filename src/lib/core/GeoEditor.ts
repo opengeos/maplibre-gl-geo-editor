@@ -270,12 +270,12 @@ export class GeoEditor implements IControl {
     // Now check each feature
     for (let i = 0; i < allFeatures.length; i++) {
       const feature = allFeatures[i];
-      
+
       // Skip undefined or null features
       if (!feature || !feature.geometry) {
         continue;
       }
-      
+
       const featureId = String(feature.id ?? `feature-${i}`);
       // Try to get geoman data by feature id first, then by index
       const geomanData = geomanDataMap.get(featureId) || geomanDataMap.get(`idx-${i}`);
@@ -1152,7 +1152,7 @@ export class GeoEditor implements IControl {
    */
   toggleSnapping(): void {
     this.snappingEnabled = !this.snappingEnabled;
-    
+
     // Attempt to set snapping if Geoman supports it (Pro version)
     if (this.geoman) {
       try {
@@ -1276,7 +1276,7 @@ export class GeoEditor implements IControl {
       }
 
       button.classList.toggle(`${CSS_PREFIX}-tool-button--active`, isActive);
-      
+
       // Clear any inline styles that might conflict with CSS - let CSS handle colors
       const svg = button.querySelector('svg');
       if (svg) {
