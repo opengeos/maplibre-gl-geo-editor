@@ -1,0 +1,481 @@
+/* ============================================================================
+   GeoEditor Control Styles
+   ============================================================================ */
+
+/* Base control container */
+.geo-editor-control {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Toolbar container */
+.geo-editor-toolbar {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Collapsed toolbar - minimal padding and no gap */
+.geo-editor-toolbar--collapsed {
+  padding: 0;
+  gap: 0;
+}
+
+.geo-editor-toolbar--vertical {
+  flex-direction: column;
+}
+
+.geo-editor-toolbar--horizontal {
+  flex-direction: row;
+}
+
+/* Tools wrapper (for collapse/expand functionality) */
+.geo-editor-tools-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.geo-editor-toolbar--horizontal .geo-editor-tools-wrapper {
+  flex-direction: row;
+}
+
+/* Collapse button */
+.geo-editor-collapse-btn {
+  margin-bottom: 4px;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+}
+
+.geo-editor-toolbar--horizontal .geo-editor-collapse-btn {
+  margin-bottom: 0;
+  margin-right: 4px;
+}
+
+/* No margin when collapsed */
+.geo-editor-toolbar--collapsed .geo-editor-collapse-btn {
+  margin: 0;
+}
+
+/* Tool group */
+.geo-editor-tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.geo-editor-toolbar--horizontal .geo-editor-tool-group {
+  flex-direction: row;
+}
+
+.geo-editor-tool-group:not(:last-child) {
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.geo-editor-toolbar--horizontal .geo-editor-tool-group:not(:last-child) {
+  padding-bottom: 0;
+  padding-right: 4px;
+  border-bottom: none;
+  border-right: 1px solid #e5e5e5;
+}
+
+.geo-editor-tool-group-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #666;
+  padding: 2px 4px;
+  letter-spacing: 0.5px;
+}
+
+.geo-editor-tool-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.geo-editor-toolbar--horizontal .geo-editor-tool-buttons {
+  flex-direction: row;
+}
+
+/* Tool button */
+.geo-editor-tool-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: #f5f5f5;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.geo-editor-tool-button:hover {
+  background: #e8e8e8;
+}
+
+.geo-editor-tool-button:active {
+  background: #ddd;
+}
+
+.geo-editor-tool-button--active {
+  background: #3388ff;
+  color: #fff;
+}
+
+.geo-editor-tool-button--active:hover {
+  background: #2277ee;
+}
+
+.geo-editor-tool-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.geo-editor-tool-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Active button icons - force white color */
+.geo-editor-tool-button--active svg,
+.geo-editor-tool-button--active svg path,
+.geo-editor-tool-button--active svg polygon,
+.geo-editor-tool-button--active svg rect,
+.geo-editor-tool-button--active svg circle,
+.geo-editor-tool-button--active svg ellipse,
+.geo-editor-tool-button--active svg line,
+.geo-editor-tool-button--active svg text {
+  fill: #fff !important;
+  stroke: #fff !important;
+  color: #fff !important;
+}
+
+/* Preserve fill="none" for stroke-only elements */
+.geo-editor-tool-button--active svg [fill="none"],
+.geo-editor-tool-button--active svg path[fill="none"],
+.geo-editor-tool-button--active svg polygon[fill="none"],
+.geo-editor-tool-button--active svg rect[fill="none"],
+.geo-editor-tool-button--active svg circle[fill="none"],
+.geo-editor-tool-button--active svg ellipse[fill="none"] {
+  fill: none !important;
+}
+
+/* Tooltip styling */
+.geo-editor-tool-button[title] {
+  position: relative;
+}
+
+/* ============================================================================
+   Dialog Styles
+   ============================================================================ */
+
+.geo-editor-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.geo-editor-dialog {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.geo-editor-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.geo-editor-dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.geo-editor-dialog-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.geo-editor-dialog-close:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.geo-editor-dialog-body {
+  padding: 20px;
+}
+
+.geo-editor-dialog-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid #e5e5e5;
+}
+
+/* ============================================================================
+   Form Controls
+   ============================================================================ */
+
+.geo-editor-form-group {
+  margin-bottom: 16px;
+}
+
+.geo-editor-form-group:last-child {
+  margin-bottom: 0;
+}
+
+.geo-editor-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.geo-editor-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.15s ease;
+}
+
+.geo-editor-input:focus {
+  outline: none;
+  border-color: #3388ff;
+  box-shadow: 0 0 0 3px rgba(51, 136, 255, 0.1);
+}
+
+.geo-editor-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5e5e5;
+  appearance: none;
+  cursor: pointer;
+}
+
+.geo-editor-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #3388ff;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.geo-editor-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.geo-editor-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: #3388ff;
+  cursor: pointer;
+}
+
+/* ============================================================================
+   Buttons
+   ============================================================================ */
+
+.geo-editor-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.geo-editor-btn--primary {
+  background: #3388ff;
+  color: #fff;
+}
+
+.geo-editor-btn--primary:hover {
+  background: #2277ee;
+}
+
+.geo-editor-btn--secondary {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.geo-editor-btn--secondary:hover {
+  background: #e8e8e8;
+}
+
+.geo-editor-btn--danger {
+  background: #dc3545;
+  color: #fff;
+}
+
+.geo-editor-btn--danger:hover {
+  background: #c82333;
+}
+
+.geo-editor-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   Stats Display
+   ============================================================================ */
+
+.geo-editor-stats {
+  display: flex;
+  gap: 20px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.geo-editor-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.geo-editor-stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.geo-editor-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #666;
+  letter-spacing: 0.5px;
+}
+
+.geo-editor-stat--highlight .geo-editor-stat-value {
+  color: #3388ff;
+}
+
+.geo-editor-stat--success .geo-editor-stat-value {
+  color: #28a745;
+}
+
+/* ============================================================================
+   Messages
+   ============================================================================ */
+
+.geo-editor-message {
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.geo-editor-message--info {
+  background: #e7f3ff;
+  color: #0056b3;
+  border: 1px solid #b8daff;
+}
+
+.geo-editor-message--warning {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+
+.geo-editor-message--error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.geo-editor-message--success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+/* ============================================================================
+   Selection Highlight
+   ============================================================================ */
+
+.geo-editor-selection-highlight {
+  stroke: #3388ff;
+  stroke-width: 3;
+  stroke-dasharray: 5, 5;
+  fill: rgba(51, 136, 255, 0.1);
+  animation: geo-editor-dash 0.5s linear infinite;
+}
+
+@keyframes geo-editor-dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* ============================================================================
+   Responsive Adjustments
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .geo-editor-toolbar {
+    padding: 2px;
+  }
+
+  .geo-editor-tool-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .geo-editor-dialog {
+    max-width: 95%;
+    margin: 10px;
+  }
+}
+

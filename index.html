@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MapLibre GL Geo Editor - Examples</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 2.5rem;
+    }
+
+    .subtitle {
+      color: rgba(255, 255, 255, 0.9);
+      text-align: center;
+      margin-bottom: 40px;
+      font-size: 1.1rem;
+    }
+
+    .examples-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .example-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      transition: transform 0.2s, box-shadow 0.2s;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+
+    .example-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+    }
+
+    .example-card h2 {
+      color: #333;
+      margin-bottom: 8px;
+      font-size: 1.3rem;
+    }
+
+    .example-card p {
+      color: #666;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .example-card .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag {
+      background: #f0f0f0;
+      color: #555;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .tag.react { background: #e1f5fe; color: #0277bd; }
+    .tag.vanilla { background: #fff3e0; color: #ef6c00; }
+    .tag.draw { background: #e8f5e9; color: #2e7d32; }
+    .tag.edit { background: #fce4ec; color: #c2185b; }
+    .tag.union { background: #e3f2fd; color: #1565c0; }
+    .tag.split { background: #f3e5f5; color: #7b1fa2; }
+    .tag.lasso { background: #fff8e1; color: #ff8f00; }
+
+    .features {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 40px;
+    }
+
+    .features h2 {
+      color: white;
+      margin-bottom: 16px;
+      font-size: 1.5rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .feature-item {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: white;
+      font-size: 0.95rem;
+    }
+
+    .feature-item strong {
+      color: #fff;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .footer a {
+      color: white;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MapLibre GL Geo Editor</h1>
+    <p class="subtitle">Advanced geometry editing control extending Geoman with Scale, Copy, Split, Union, Difference, Simplify, and Lasso selection</p>
+
+    <div class="examples-grid">
+      <a href="./examples/basic/index.html" class="example-card">
+        <h2>Basic Example</h2>
+        <p>Simple setup with all editing tools. Draw polygons, lines, and points, then use advanced editing features.</p>
+        <div class="tags">
+          <span class="tag vanilla">Vanilla JS</span>
+          <span class="tag draw">Draw</span>
+          <span class="tag edit">Edit</span>
+        </div>
+      </a>
+
+      <a href="./examples/react/index.html" class="example-card">
+        <h2>React Integration</h2>
+        <p>React component integration using GeoEditorReact with hooks and proper lifecycle management.</p>
+        <div class="tags">
+          <span class="tag react">React</span>
+          <span class="tag">TypeScript</span>
+          <span class="tag">Hooks</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="features">
+      <h2>Advanced Features</h2>
+      <div class="features-grid">
+        <div class="feature-item"><strong>Scale</strong> - Resize features with drag handles</div>
+        <div class="feature-item"><strong>Copy</strong> - Duplicate features (Ctrl+C/V)</div>
+        <div class="feature-item"><strong>Split</strong> - Split polygons/lines with a drawn line</div>
+        <div class="feature-item"><strong>Union</strong> - Merge multiple polygons into one</div>
+        <div class="feature-item"><strong>Difference</strong> - Subtract polygon from another</div>
+        <div class="feature-item"><strong>Simplify</strong> - Reduce vertices (Douglas-Peucker)</div>
+        <div class="feature-item"><strong>Lasso</strong> - Select features by drawing polygon</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>
+        <a href="https://github.com/opengeos/maplibre-gl-geo-editor">GitHub</a> ·
+        <a href="https://www.npmjs.com/package/maplibre-gl-geo-editor">npm</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>
