@@ -10,6 +10,7 @@ import type {
   GeoJsonProperties,
   Geometry,
 } from 'geojson';
+import type { MapMouseEvent, MapTouchEvent } from 'maplibre-gl';
 
 // ============================================================================
 // Draw and Edit Mode Types
@@ -308,9 +309,10 @@ export interface GeomanInstance {
 }
 
 export interface GeomanFeatureData {
-  id: string;
+  id: string | number;
   shape: string;
-  geoJson: Feature;
+  geoJson?: Feature;
+  getGeoJson?: () => Feature;
   delete: () => void;
 }
 
@@ -323,7 +325,10 @@ export interface GeomanFeaturesAPI {
   deleteAll: () => void;
   importGeoJson: (geoJson: FeatureCollection, options?: { overwrite?: boolean }) => { success: number; failed: number };
   importGeoJsonFeature: (feature: Feature) => GeomanFeatureData | null;
-  getFeatureByMouseEvent: (options: { event: MouseEvent; sourceNames?: string[] }) => GeomanFeatureData | null;
+  getFeatureByMouseEvent: (options: {
+    event: MapMouseEvent | MapTouchEvent;
+    sourceNames?: string[];
+  }) => GeomanFeatureData | null;
   getFeaturesByScreenBounds: (options: { bounds: [[number, number], [number, number]]; sourceNames?: string[] }) => GeomanFeatureData[];
 }
 

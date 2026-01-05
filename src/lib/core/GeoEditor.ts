@@ -198,8 +198,10 @@ export class GeoEditor implements IControl {
         return;
       }
 
-      // Find the clicked feature
-      const result = this.findFeatureAtPoint(e.lngLat.lng, e.lngLat.lat);
+      // Find the clicked feature (prefer Geoman's hit test, fallback to turf)
+      const result =
+        this.findFeatureByMouseEvent(e) ||
+        this.findFeatureAtPoint(e.lngLat.lng, e.lngLat.lat);
 
       if (result) {
         const { feature, geomanData } = result;
@@ -243,12 +245,12 @@ export class GeoEditor implements IControl {
       // Try forEach to build a map of geoman data
       let index = 0;
       this.geoman.features.forEach((fd) => {
+        const feature = this.getGeomanFeature(fd);
         // Skip if geoman data or its geoJson is undefined
-        if (!fd || !fd.geoJson || !fd.geoJson.geometry) {
+        if (!fd || !feature || !feature.geometry) {
           index++;
           return;
         }
-        const feature = fd.geoJson;
         // Use index as fallback since fd.id might be undefined
         const featureId = String(fd.id ?? feature.id ?? `feature-${index}`);
         allFeatures.push(feature);
@@ -312,6 +314,32 @@ export class GeoEditor implements IControl {
   }
 
   /**
+   * Find a feature at the mouse event using Geoman's hit test
+   */
+  private findFeatureByMouseEvent(
+    e: MapMouseEvent
+  ): { feature: Feature; geomanData: GeomanFeatureData } | null {
+    if (!this.geoman || !e.originalEvent) {
+      return null;
+    }
+
+    try {
+      const geomanData = this.geoman.features.getFeatureByMouseEvent({
+        event: e,
+      });
+      const feature = this.getGeomanFeature(geomanData);
+
+      if (feature) {
+        return { feature, geomanData };
+      }
+    } catch {
+      // Fall back to turf-based hit testing
+    }
+
+    return null;
+  }
+
+  /**
    * Find geoman data for a feature by searching
    */
   private findGeomanDataForFeature(targetFeature: Feature): GeomanFeatureData | null {
@@ -323,10 +351,13 @@ export class GeoEditor implements IControl {
       this.geoman.features.forEach((fd) => {
         if (foundData) return;
 
+        const feature = this.getGeomanFeature(fd);
+        if (!feature) return;
+
         // Match by ID or by geometry
-        if (fd.geoJson.id === targetFeature.id) {
+        if (feature.id === targetFeature.id) {
           foundData = fd;
-        } else if (JSON.stringify(fd.geoJson.geometry) === JSON.stringify(targetFeature.geometry)) {
+        } else if (JSON.stringify(feature.geometry) === JSON.stringify(targetFeature.geometry)) {
           foundData = fd;
         }
       });
@@ -335,6 +366,20 @@ export class GeoEditor implements IControl {
     }
 
     return foundData;
+  }
+
+  private getGeomanFeature(geomanData?: GeomanFeatureData | null): Feature | null {
+    if (!geomanData) return null;
+
+    if (typeof geomanData.getGeoJson === 'function') {
+      try {
+        return geomanData.getGeoJson();
+      } catch {
+        return null;
+      }
+    }
+
+    return geomanData.geoJson ?? null;
   }
 
   /**
@@ -351,7 +396,7 @@ export class GeoEditor implements IControl {
    * Toggle feature in selection
    */
   private toggleFeatureSelection(feature: Feature, geomanData?: GeomanFeatureData): void {
-    const featureId = geomanData?.id || String(feature.id);
+    const featureId = String(geomanData?.id ?? feature.id);
     const isSelected = this.state.selectedFeatures.some((s) => s.id === featureId);
 
     if (isSelected) {
@@ -404,7 +449,10 @@ export class GeoEditor implements IControl {
         // Fallback
         const features: Feature[] = [];
         this.geoman.features.forEach((fd) => {
-          features.push(fd.geoJson);
+          const feature = this.getGeomanFeature(fd);
+          if (feature) {
+            features.push(feature);
+          }
         });
         return { type: 'FeatureCollection', features };
       }
@@ -651,7 +699,7 @@ export class GeoEditor implements IControl {
    */
   selectFeatures(features: Feature[], geomanDataList?: GeomanFeatureData[]): void {
     this.state.selectedFeatures = features.map((f, i) => ({
-      id: geomanDataList?.[i]?.id || String(f.id || Date.now()),
+      id: String(geomanDataList?.[i]?.id ?? f.id ?? Date.now()),
       feature: f,
       layerId: 'default',
       geomanData: geomanDataList?.[i],
@@ -664,7 +712,7 @@ export class GeoEditor implements IControl {
    * Add feature to selection
    */
   addToSelection(feature: Feature, geomanData?: GeomanFeatureData): void {
-    const featureId = geomanData?.id || String(feature.id);
+    const featureId = String(geomanData?.id ?? feature.id);
     const exists = this.state.selectedFeatures.some(
       (s) => s.id === featureId
     );
@@ -855,7 +903,8 @@ export class GeoEditor implements IControl {
     try {
       // Try to find and delete the feature
       this.geoman.features.forEach((fd) => {
-        if (fd.id === featureId || fd.geoJson.id === featureId) {
+        const feature = this.getGeomanFeature(fd);
+        if (String(fd.id) === featureId || String(feature?.id) === featureId) {
           fd.delete();
         }
       });
