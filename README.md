@@ -74,6 +74,7 @@ map.on('load', () => {
     const geoEditor = new GeoEditor({
       position: 'top-left',
       toolbarOrientation: 'vertical',
+      columns: 2,  // Display buttons in 2 columns (reduces toolbar height)
       drawModes: ['polygon', 'line', 'rectangle', 'circle', 'marker', 'freehand'],
       editModes: [
         'select', 'drag', 'change', 'rotate', 'cut', 'delete',
@@ -161,6 +162,7 @@ function App() {
 | `editModes` | `EditMode[]` | All modes | Edit modes to enable |
 | `fileModes` | `FileMode[]` | `['open', 'save']` | File operations to enable |
 | `toolbarOrientation` | `'vertical' \| 'horizontal'` | `'vertical'` | Toolbar layout |
+| `columns` | `number` | `1` | Number of button columns (vertical orientation only) |
 | `showLabels` | `boolean` | `false` | Show text labels on buttons |
 | `simplifyTolerance` | `number` | `0.001` | Default simplification tolerance |
 | `saveFilename` | `string` | `'features.geojson'` | Default filename for saving |

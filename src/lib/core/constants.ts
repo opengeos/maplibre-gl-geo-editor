@@ -87,6 +87,7 @@ export const DEFAULT_OPTIONS: GeoEditorOptionsRequired = {
   onGeoJsonSave: () => {},
   showFeatureProperties: true,
   fitBoundsOnLoad: true,
+  columns: 1,
 };
 
 /**

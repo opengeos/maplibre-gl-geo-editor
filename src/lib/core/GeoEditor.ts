@@ -1783,6 +1783,11 @@ export class GeoEditor implements IControl {
     this.toolbar = document.createElement('div');
     this.toolbar.className = `${CSS_PREFIX}-toolbar ${CSS_PREFIX}-toolbar--${this.options.toolbarOrientation}`;
 
+    // Add columns class for multi-column layout (only for vertical orientation)
+    if (this.options.toolbarOrientation === 'vertical' && this.options.columns > 1) {
+      this.toolbar.classList.add(`${CSS_PREFIX}-toolbar--columns-${this.options.columns}`);
+    }
+
     // Add collapsed class if starting collapsed
     if (this.state.collapsed) {
       this.toolbar.classList.add(`${CSS_PREFIX}-toolbar--collapsed`);

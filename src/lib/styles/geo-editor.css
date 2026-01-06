@@ -103,6 +103,25 @@
   flex-direction: row;
 }
 
+/* Multi-column layout for button groups (vertical orientation only) */
+.geo-editor-toolbar--vertical.geo-editor-toolbar--columns-2 .geo-editor-tool-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+}
+
+.geo-editor-toolbar--vertical.geo-editor-toolbar--columns-3 .geo-editor-tool-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+}
+
+.geo-editor-toolbar--vertical.geo-editor-toolbar--columns-4 .geo-editor-tool-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+}
+
 /* Tool button */
 .geo-editor-tool-button {
   display: flex;

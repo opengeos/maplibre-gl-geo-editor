@@ -104,6 +104,8 @@ export interface GeoEditorOptions {
   showFeatureProperties?: boolean;
   /** Auto-fit map bounds when GeoJSON is loaded (default: true) */
   fitBoundsOnLoad?: boolean;
+  /** Number of columns for button layout in vertical orientation (default: 1) */
+  columns?: number;
 }
 
 export type GeoEditorOptionsRequired = Required<GeoEditorOptions>;
