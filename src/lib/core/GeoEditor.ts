@@ -1059,6 +1059,7 @@ export class GeoEditor implements IControl {
         id: INTERNAL_IDS.SELECTION_FILL_LAYER,
         type: 'fill',
         source: INTERNAL_IDS.SELECTION_SOURCE,
+        filter: ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false],
         paint: {
           'fill-color': '#ffff00',
           'fill-opacity': 0.3,
@@ -1081,6 +1082,13 @@ export class GeoEditor implements IControl {
       // Layers exist, move them to the top to ensure visibility
       try {
         if (this.map.getLayer(INTERNAL_IDS.SELECTION_FILL_LAYER)) {
+          this.map.setFilter(INTERNAL_IDS.SELECTION_FILL_LAYER, [
+            'match',
+            ['geometry-type'],
+            ['Polygon', 'MultiPolygon'],
+            true,
+            false,
+          ]);
           this.map.moveLayer(INTERNAL_IDS.SELECTION_FILL_LAYER);
         }
         if (this.map.getLayer(INTERNAL_IDS.SELECTION_LINE_LAYER)) {
