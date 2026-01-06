@@ -39,6 +39,9 @@ jobs:
       - name: Build examples for deployment
         run: npm run build:examples
 
+      - name: Copy CDN example (static, no build processing)
+        run: cp -r examples/cdn dist-examples/examples/cdn
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
         with:
