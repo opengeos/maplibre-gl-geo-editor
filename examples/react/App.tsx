@@ -133,8 +133,18 @@ function App() {
           position="top-left"
           collapsed={false}
           toolbarOrientation="vertical"
-          drawModes={['polygon', 'line', 'rectangle', 'circle', 'marker']}
+          drawModes={[
+            'polygon',
+            'line',
+            'rectangle',
+            'circle',
+            'marker',
+            'circle_marker',
+            'ellipse',
+            'freehand',
+          ]}
           editModes={[
+            'select',
             'drag',
             'change',
             'rotate',
