@@ -19,7 +19,7 @@ A powerful MapLibre GL plugin for creating and editing geometries. Extends the f
 - **Edit** - Modify feature vertices
 - **Rotate** - Rotate features
 - **Cut** - Cut holes in polygons
-- **Delete** - Remove features
+- **Delete** - Remove selected features (supports multi-select)
 
 ### Advanced Edit Tools (Custom Implementation)
 - **Scale** - Resize features with interactive handles
@@ -28,7 +28,8 @@ A powerful MapLibre GL plugin for creating and editing geometries. Extends the f
 - **Union** - Merge multiple polygons into one
 - **Difference** - Subtract one polygon from another
 - **Simplify** - Reduce vertices using Douglas-Peucker algorithm
-- **Lasso** - Select multiple features by drawing a polygon
+- **Lasso** - Select multiple features by drawing a polygon (supports union/difference/drag)
+- **Reset** - Clear selection and disable active tools (toolbar button)
 
 ## Installation
 
@@ -168,6 +169,7 @@ geoEditor.disableAllModes();
 geoEditor.selectFeatures(features);
 geoEditor.clearSelection();
 geoEditor.getSelectedFeatures();
+geoEditor.getSelectedFeatureCollection();
 
 // Clipboard
 geoEditor.copySelectedFeatures();
@@ -176,6 +178,13 @@ geoEditor.deleteSelectedFeatures();
 
 // Get all features
 geoEditor.getFeatures();
+geoEditor.getAllFeatureCollection();
+
+// Operation snapshots
+geoEditor.getLastCreatedFeature();
+geoEditor.getLastEditedFeature();
+geoEditor.getLastDeletedFeature();
+geoEditor.getLastDeletedFeatureId();
 
 // Get state
 geoEditor.getState();
@@ -211,6 +220,10 @@ map.getContainer().addEventListener('gm:lassoend', (e) => {
 | `Ctrl+V` | Paste features |
 | `Delete` | Delete selected features |
 | `Escape` | Cancel operation / Clear selection |
+
+## Logging
+
+GeoEditor logs the current selected FeatureCollection to the console whenever a feature is selected, created, edited, or deleted.
 
 ## Standalone Feature Classes
 

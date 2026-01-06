@@ -490,6 +490,7 @@ export class GeoEditor implements IControl {
           this.options.onFeatureEdit?.(result.feature, this.scaleStartFeature);
         }
         this.lastEditedFeature = result.feature;
+        this.logSelectedFeatureCollection('edited');
         this.scaleFeature.showHandlesForFeature(result.feature);
         this.bringScaleHandlesToFront();
         this.emitEvent('gm:scaleend', {
@@ -606,6 +607,7 @@ export class GeoEditor implements IControl {
           }
         });
         this.lastEditedFeature = this.state.selectedFeatures[this.state.selectedFeatures.length - 1]?.feature ?? null;
+        this.logSelectedFeatureCollection('edited');
       }
 
       this.multiDragStartPoint = null;
@@ -713,6 +715,35 @@ export class GeoEditor implements IControl {
     } catch {
       // Ignore move errors
     }
+  }
+
+  private logSelectedFeatureCollection(action: string): void {
+    console.log(`GeoEditor selection (${action})`, this.getSelectedFeatureCollection());
+  }
+
+  private extractFeatureFromEvent(featureLike: unknown): Feature | null {
+    if (!featureLike || typeof featureLike !== 'object') {
+      return null;
+    }
+
+    const candidate = featureLike as { getGeoJson?: () => Feature; geoJson?: Feature; geometry?: Feature['geometry'] };
+    if (typeof candidate.getGeoJson === 'function') {
+      try {
+        return candidate.getGeoJson();
+      } catch {
+        return null;
+      }
+    }
+
+    if (candidate.geoJson) {
+      return candidate.geoJson;
+    }
+
+    if ('geometry' in candidate) {
+      return candidate as Feature;
+    }
+
+    return null;
   }
 
   /**
@@ -858,6 +889,10 @@ export class GeoEditor implements IControl {
           this.geoman.enableGlobalCutMode();
           break;
         case 'delete':
+          if (this.state.selectedFeatures.length > 0) {
+            this.deleteSelectedFeatures();
+            return;
+          }
           this.geoman.enableGlobalRemovalMode();
           break;
       }
@@ -1088,6 +1123,7 @@ export class GeoEditor implements IControl {
     }));
     this.updateSelectionHighlight();
     this.options.onSelectionChange?.(features);
+    this.logSelectedFeatureCollection('selected');
   }
 
   /**
@@ -1108,6 +1144,7 @@ export class GeoEditor implements IControl {
       });
       this.updateSelectionHighlight();
       this.options.onSelectionChange?.(this.getSelectedFeatures());
+      this.logSelectedFeatureCollection('selected');
     }
   }
 
@@ -1120,6 +1157,7 @@ export class GeoEditor implements IControl {
     );
     this.updateSelectionHighlight();
     this.options.onSelectionChange?.(this.getSelectedFeatures());
+    this.logSelectedFeatureCollection('selected');
   }
 
   /**
@@ -1129,6 +1167,7 @@ export class GeoEditor implements IControl {
     this.state.selectedFeatures = [];
     this.updateSelectionHighlight();
     this.options.onSelectionChange?.([]);
+    this.logSelectedFeatureCollection('selected');
   }
 
   // ============================================================================
@@ -1268,6 +1307,7 @@ export class GeoEditor implements IControl {
         clearSelection: !shouldBatch,
         disableModes: !shouldBatch,
       });
+      this.logSelectedFeatureCollection('edited');
     });
 
     if (shouldBatch) {
@@ -1363,6 +1403,7 @@ export class GeoEditor implements IControl {
     });
 
     this.clearSelection();
+    this.logSelectedFeatureCollection('deleted');
   }
 
   private deleteGeomanFeatureData(
@@ -1402,6 +1443,7 @@ export class GeoEditor implements IControl {
       this.lastDeletedFeature = feature;
       this.lastDeletedFeatureId = fallbackId ?? null;
     });
+    this.logSelectedFeatureCollection('deleted');
   }
 
   private clearGeomanTemporaryFeatures(): void {
@@ -1449,13 +1491,14 @@ export class GeoEditor implements IControl {
     this.clearSelection();
 
     // Add new parts
-    if (this.geoman) {
-      result.parts.forEach((part) => {
-        this.geoman?.features.importGeoJsonFeature(part);
-        this.options.onFeatureCreate?.(part);
-        this.lastCreatedFeature = part;
-      });
-    }
+      if (this.geoman) {
+        result.parts.forEach((part) => {
+          this.geoman?.features.importGeoJsonFeature(part);
+          this.options.onFeatureCreate?.(part);
+          this.lastCreatedFeature = part;
+        });
+        this.logSelectedFeatureCollection('created');
+      }
 
     this.emitEvent('gm:split', result);
     this.disableAllModes();
@@ -1477,6 +1520,7 @@ export class GeoEditor implements IControl {
       this.geoman.features.importGeoJsonFeature(result.result);
       this.options.onFeatureCreate?.(result.result);
       this.lastCreatedFeature = result.result;
+      this.logSelectedFeatureCollection('created');
     }
 
     this.emitEvent('gm:union', result);
@@ -1499,6 +1543,7 @@ export class GeoEditor implements IControl {
       this.geoman.features.importGeoJsonFeature(result.result);
       this.options.onFeatureCreate?.(result.result);
       this.lastCreatedFeature = result.result;
+      this.logSelectedFeatureCollection('created');
     }
 
     this.emitEvent('gm:difference', result);
@@ -2020,14 +2065,29 @@ export class GeoEditor implements IControl {
     if (!this.geoman) return;
 
     this.geoman.setGlobalEventsListener((event) => {
+      const eventName = (event as { name?: string; type?: string }).name ?? event.type ?? '';
+      const eventFeature = this.extractFeatureFromEvent((event as { feature?: unknown }).feature);
+
       // Handle feature creation
-      if (event.type === 'gm:create' && event.feature) {
-        this.lastCreatedFeature = event.feature;
-        this.options.onFeatureCreate?.(event.feature);
+      if ((eventName === 'gm:create' || event.type === 'gm:create') && eventFeature) {
+        this.lastCreatedFeature = eventFeature;
+        this.options.onFeatureCreate?.(eventFeature);
+        this.logSelectedFeatureCollection('created');
+      }
+
+      if ((event as { action?: string }).action === 'feature_updated' && eventFeature) {
+        this.lastEditedFeature = eventFeature;
+        this.logSelectedFeatureCollection('edited');
+      }
+
+      if ((event as { action?: string }).action === 'feature_removed' && eventFeature) {
+        this.lastDeletedFeature = eventFeature;
+        this.lastDeletedFeatureId = this.getGeomanIdFromFeature(eventFeature);
+        this.logSelectedFeatureCollection('deleted');
       }
 
       // Handle mode changes
-      if (event.type?.includes('modetoggled')) {
+      if (eventName.includes('modetoggled') || event.type?.includes('modetoggled')) {
         this.updateToolbarState();
       }
     });
