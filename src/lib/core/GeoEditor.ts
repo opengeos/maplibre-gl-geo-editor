@@ -360,12 +360,7 @@ export class GeoEditor implements IControl {
     if (!this.geoman) return null;
 
     let foundData: GeomanFeatureData | null = null;
-    const targetId = String(
-      targetFeature.id ??
-        (targetFeature.properties as { __gm_id?: string | number } | undefined)?.__gm_id ??
-        (targetFeature.properties as { id?: string | number } | undefined)?.id ??
-        ''
-    );
+    const targetId = this.getGeomanIdFromFeature(targetFeature);
 
     try {
       this.geoman.features.forEach((fd) => {
@@ -377,8 +372,7 @@ export class GeoEditor implements IControl {
         // Match by ID or by geometry
         if (
           (targetId && String(feature.id) === targetId) ||
-          (targetId &&
-            String((feature.properties as { __gm_id?: string | number } | undefined)?.__gm_id) === targetId)
+          (targetId && this.getGeomanIdFromFeature(feature) === targetId)
         ) {
           foundData = fd;
         } else if (JSON.stringify(feature.geometry) === JSON.stringify(targetFeature.geometry)) {
@@ -390,6 +384,12 @@ export class GeoEditor implements IControl {
     }
 
     return foundData;
+  }
+
+  private getGeomanIdFromFeature(feature: Feature): string | null {
+    const props = feature.properties as { __gm_id?: string | number; id?: string | number } | undefined;
+    const raw = feature.id ?? props?.__gm_id ?? props?.id;
+    return raw !== undefined && raw !== null ? String(raw) : null;
   }
 
   private getGeomanFeature(geomanData?: GeomanFeatureData | null): Feature | null {
@@ -1118,6 +1118,7 @@ export class GeoEditor implements IControl {
 
     try {
       // Try to find and delete the feature
+      const toDelete: GeomanFeatureData[] = [];
       this.geoman.features.forEach((fd) => {
         const feature = this.getGeomanFeature(fd);
         const featureProps = feature?.properties as { __gm_id?: string | number } | undefined;
@@ -1126,8 +1127,11 @@ export class GeoEditor implements IControl {
           String(feature?.id) === featureId ||
           String(featureProps?.__gm_id) === featureId
         ) {
-          fd.delete();
+          toDelete.push(fd);
         }
+      });
+      toDelete.forEach((fd) => {
+        this.deleteGeomanFeatureData(fd);
       });
     } catch {
       // Silently fail if feature not found
@@ -1145,21 +1149,48 @@ export class GeoEditor implements IControl {
 
     selected.forEach((s) => {
       const geomanData = s.geomanData ?? this.findGeomanDataForFeature(s.feature);
-      // Use geoman data's delete method if available (most reliable)
-      if (geomanData?.delete) {
-        try {
-          geomanData.delete();
-        } catch {
-          // Fallback to ID-based deletion
-          this.deleteFeatureById(s.id);
-        }
-      } else {
-        this.deleteFeatureById(s.id);
-      }
+      this.deleteGeomanFeatureData(geomanData, s.id);
       this.options.onFeatureDelete?.(s.id);
     });
 
     this.clearSelection();
+  }
+
+  private deleteGeomanFeatureData(
+    geomanData?: GeomanFeatureData | null,
+    fallbackId?: string | null
+  ): void {
+    if (!this.geoman) return;
+
+    if (geomanData) {
+      try {
+        this.geoman.features.delete(geomanData);
+        return;
+      } catch {
+        // Continue with fallback delete
+      }
+      try {
+        geomanData.delete();
+        return;
+      } catch {
+        // Continue with fallback delete
+      }
+    }
+
+    if (fallbackId) {
+      this.deleteFeatureById(fallbackId);
+    }
+  }
+
+  private deleteGeomanFeatures(features: Feature[]): void {
+    features.forEach((feature) => {
+      const geomanData = this.findGeomanDataForFeature(feature);
+      const fallbackId = this.getGeomanIdFromFeature(feature);
+      this.deleteGeomanFeatureData(geomanData, fallbackId ?? undefined);
+      if (fallbackId) {
+        this.options.onFeatureDelete?.(fallbackId);
+      }
+    });
   }
 
   private clearGeomanTemporaryFeatures(): void {
@@ -1201,9 +1232,10 @@ export class GeoEditor implements IControl {
       return;
     }
 
-    // Remove original feature using stored geoman data
-    this.deleteSelectedFeatures();
+    // Remove original feature using provided result data
+    this.deleteGeomanFeatures([result.original]);
     this.clearGeomanTemporaryFeatures();
+    this.clearSelection();
 
     // Add new parts
     if (this.geoman) {
@@ -1223,9 +1255,10 @@ export class GeoEditor implements IControl {
       return;
     }
 
-    // Remove original features using stored geoman data
-    this.deleteSelectedFeatures();
+    // Remove original features using provided result data
+    this.deleteGeomanFeatures(result.originals);
     this.clearGeomanTemporaryFeatures();
+    this.clearSelection();
 
     // Add merged feature
     if (this.geoman) {
@@ -1243,9 +1276,10 @@ export class GeoEditor implements IControl {
       return;
     }
 
-    // Remove original features using stored geoman data
-    this.deleteSelectedFeatures();
+    // Remove original features using provided result data
+    this.deleteGeomanFeatures([result.base, ...result.subtracted]);
     this.clearGeomanTemporaryFeatures();
+    this.clearSelection();
 
     // Add result if not null (complete subtraction)
     if (result.result && this.geoman) {
@@ -1259,13 +1293,13 @@ export class GeoEditor implements IControl {
 
   private handleSimplifyResult(result: SimplifyResult): void {
     // Remove original feature
-    const originalId = String(result.original.id);
-    this.deleteFeatureById(originalId);
+    this.deleteGeomanFeatures([result.original]);
     this.clearGeomanTemporaryFeatures();
+    this.clearSelection();
 
     // Add simplified feature
     if (this.geoman) {
-      result.result.id = originalId;
+      result.result.id = this.getGeomanIdFromFeature(result.original) ?? result.result.id;
       this.geoman.features.importGeoJsonFeature(result.result);
       this.options.onFeatureEdit?.(result.result, result.original);
     }
