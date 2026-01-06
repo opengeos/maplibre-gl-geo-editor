@@ -65,12 +65,28 @@ export class GeoEditor implements IControl {
   // Snapping state (independent of other modes)
   private snappingEnabled: boolean = false;
 
+  // Last known feature operations
+  private lastCreatedFeature: Feature | null = null;
+  private lastEditedFeature: Feature | null = null;
+  private lastDeletedFeature: Feature | null = null;
+  private lastDeletedFeatureId: string | null = null;
+
   // Scale mode state
   private isScaling: boolean = false;
   private scaleTargetFeature: Feature | null = null;
   private scaleTargetGeomanData: GeomanFeatureData | null = null;
   private scaleStartFeature: Feature | null = null;
   private scaleDragPanEnabled: boolean | null = null;
+
+  // Multi-drag mode state
+  private isMultiDragging: boolean = false;
+  private multiDragStartPoint: [number, number] | null = null;
+  private multiDragOriginalFeatures: Feature[] = [];
+  private multiDragGeomanData: (GeomanFeatureData | null)[] = [];
+  private multiDragPanEnabled: boolean | null = null;
+  private boundMultiDragMouseDown: ((e: MapMouseEvent) => void) | null = null;
+  private boundMultiDragMouseMove: ((e: MapMouseEvent) => void) | null = null;
+  private boundMultiDragMouseUp: ((e: MapMouseEvent) => void) | null = null;
 
   // Toolbar element reference
   private toolbar: HTMLDivElement | null = null;
@@ -127,6 +143,7 @@ export class GeoEditor implements IControl {
     // Setup selection handler
     this.setupSelectionHandler();
     this.setupScaleHandler();
+    this.setupMultiDragHandler();
 
     // Setup geoman event listener if geoman is available
     this.setupGeomanEvents();
@@ -141,6 +158,7 @@ export class GeoEditor implements IControl {
     this.removeKeyboardShortcuts();
     this.removeSelectionHandler();
     this.removeScaleHandler();
+    this.removeMultiDragHandler();
     this.disableAllModes();
 
     // Cleanup feature handlers
@@ -471,6 +489,7 @@ export class GeoEditor implements IControl {
         if (this.scaleStartFeature) {
           this.options.onFeatureEdit?.(result.feature, this.scaleStartFeature);
         }
+        this.lastEditedFeature = result.feature;
         this.scaleFeature.showHandlesForFeature(result.feature);
         this.bringScaleHandlesToFront();
         this.emitEvent('gm:scaleend', {
@@ -503,6 +522,129 @@ export class GeoEditor implements IControl {
       this.map.off('mouseup', this.boundScaleMouseUp);
       this.boundScaleMouseUp = null;
     }
+  }
+
+  /**
+   * Setup mouse handlers for multi-drag when multiple features are selected
+   */
+  private setupMultiDragHandler(): void {
+    this.boundMultiDragMouseDown = (e: MapMouseEvent) => {
+      if (this.state.activeEditMode !== 'drag') {
+        return;
+      }
+      if (this.state.selectedFeatures.length < 2) {
+        return;
+      }
+
+      const hit = this.findFeatureByMouseEvent(e) || this.findFeatureAtPoint(e.lngLat.lng, e.lngLat.lat);
+      if (!hit) {
+        return;
+      }
+
+      const hitId = this.getGeomanIdFromFeature(hit.feature);
+      const isSelected = this.state.selectedFeatures.some(
+        (s) => this.getGeomanIdFromFeature(s.feature) === hitId
+      );
+      if (!isSelected) {
+        return;
+      }
+
+      e.preventDefault();
+      this.isMultiDragging = true;
+      this.multiDragStartPoint = [e.lngLat.lng, e.lngLat.lat];
+      this.multiDragOriginalFeatures = this.state.selectedFeatures.map((s) => turf.clone(s.feature));
+      this.multiDragGeomanData = this.state.selectedFeatures.map(
+        (s) => s.geomanData ?? this.findGeomanDataForFeature(s.feature)
+      );
+
+      this.disableMultiDragPan();
+    };
+
+    this.boundMultiDragMouseMove = (e: MapMouseEvent) => {
+      if (!this.isMultiDragging || !this.multiDragStartPoint) {
+        return;
+      }
+
+      const start = this.multiDragStartPoint;
+      const current: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+      const distance = turf.distance(turf.point(start), turf.point(current), { units: 'kilometers' });
+      const bearing = turf.bearing(turf.point(start), turf.point(current));
+
+      const updated: Feature[] = [];
+      this.multiDragOriginalFeatures.forEach((feature, index) => {
+        const moved = turf.transformTranslate(feature, distance, bearing, { units: 'kilometers' });
+        const geomanData = this.multiDragGeomanData[index];
+        if (geomanData?.updateGeometry) {
+          geomanData.updateGeometry(moved.geometry);
+        } else if (geomanData?.updateGeoJsonGeometry) {
+          geomanData.updateGeoJsonGeometry(moved.geometry);
+        }
+        updated.push(moved);
+      });
+
+      this.state.selectedFeatures = this.state.selectedFeatures.map((s, index) => ({
+        ...s,
+        feature: updated[index] ?? s.feature,
+      }));
+
+      this.updateSelectionHighlight();
+    };
+
+    this.boundMultiDragMouseUp = () => {
+      if (!this.isMultiDragging) {
+        return;
+      }
+
+      this.isMultiDragging = false;
+      this.restoreMultiDragPan();
+
+      if (this.state.selectedFeatures.length > 0) {
+        this.state.selectedFeatures.forEach((featureState, index) => {
+          const original = this.multiDragOriginalFeatures[index];
+          if (original) {
+            this.options.onFeatureEdit?.(featureState.feature, original);
+          }
+        });
+        this.lastEditedFeature = this.state.selectedFeatures[this.state.selectedFeatures.length - 1]?.feature ?? null;
+      }
+
+      this.multiDragStartPoint = null;
+      this.multiDragOriginalFeatures = [];
+      this.multiDragGeomanData = [];
+    };
+
+    this.map.on('mousedown', this.boundMultiDragMouseDown);
+    this.map.on('mousemove', this.boundMultiDragMouseMove);
+    this.map.on('mouseup', this.boundMultiDragMouseUp);
+  }
+
+  private removeMultiDragHandler(): void {
+    if (this.boundMultiDragMouseDown) {
+      this.map.off('mousedown', this.boundMultiDragMouseDown);
+      this.boundMultiDragMouseDown = null;
+    }
+    if (this.boundMultiDragMouseMove) {
+      this.map.off('mousemove', this.boundMultiDragMouseMove);
+      this.boundMultiDragMouseMove = null;
+    }
+    if (this.boundMultiDragMouseUp) {
+      this.map.off('mouseup', this.boundMultiDragMouseUp);
+      this.boundMultiDragMouseUp = null;
+    }
+  }
+
+  private disableMultiDragPan(): void {
+    this.multiDragPanEnabled = this.map.dragPan.isEnabled();
+    if (this.multiDragPanEnabled) {
+      this.map.dragPan.disable();
+    }
+  }
+
+  private restoreMultiDragPan(): void {
+    if (this.multiDragPanEnabled) {
+      this.map.dragPan.enable();
+    }
+    this.multiDragPanEnabled = null;
   }
 
   private getScaleHandleFromEvent(e: MapMouseEvent): ScaleHandlePosition | null {
@@ -620,6 +762,13 @@ export class GeoEditor implements IControl {
     return this.state.selectedFeatures.map((s) => s.feature);
   }
 
+  getSelectedFeatureCollection(): FeatureCollection {
+    return {
+      type: 'FeatureCollection',
+      features: this.getSelectedFeatures(),
+    };
+  }
+
   /**
    * Get all features from the map
    */
@@ -640,6 +789,26 @@ export class GeoEditor implements IControl {
       }
     }
     return { type: 'FeatureCollection', features: [] };
+  }
+
+  getAllFeatureCollection(): FeatureCollection {
+    return this.getFeatures();
+  }
+
+  getLastCreatedFeature(): Feature | null {
+    return this.lastCreatedFeature;
+  }
+
+  getLastEditedFeature(): Feature | null {
+    return this.lastEditedFeature;
+  }
+
+  getLastDeletedFeature(): Feature | null {
+    return this.lastDeletedFeature;
+  }
+
+  getLastDeletedFeatureId(): string | null {
+    return this.lastDeletedFeatureId;
   }
 
   // ============================================================================
@@ -675,7 +844,9 @@ export class GeoEditor implements IControl {
       // Use Geoman's built-in modes
       switch (mode) {
         case 'drag':
-          this.geoman.enableGlobalDragMode();
+          if (this.state.selectedFeatures.length < 2) {
+            this.geoman.enableGlobalDragMode();
+          }
           break;
         case 'change':
           this.geoman.enableGlobalEditMode();
@@ -712,6 +883,11 @@ export class GeoEditor implements IControl {
     this.splitFeature.cancelSplit();
     this.disableSelectMode();
     this.restoreScaleDragPan();
+    this.restoreMultiDragPan();
+    this.isMultiDragging = false;
+    this.multiDragStartPoint = null;
+    this.multiDragOriginalFeatures = [];
+    this.multiDragGeomanData = [];
     this.isScaling = false;
     this.scaleTargetFeature = null;
     this.scaleTargetGeomanData = null;
@@ -769,8 +945,14 @@ export class GeoEditor implements IControl {
    * Enable union mode (interactive polygon selection)
    */
   private enableUnionMode(): void {
+    const selected = this.getSelectedFeatures();
+    const polygons = getPolygonFeatures(selected);
+    if (polygons.length >= 2) {
+      this.executeUnion();
+      return;
+    }
+
     this.pendingOperation = 'union';
-    this.clearSelection();
     this.map.getCanvas().style.cursor = 'pointer';
   }
 
@@ -778,8 +960,14 @@ export class GeoEditor implements IControl {
    * Enable difference mode (interactive polygon selection)
    */
   private enableDifferenceMode(): void {
+    const selected = this.getSelectedFeatures();
+    const polygons = getPolygonFeatures(selected);
+    if (polygons.length >= 2) {
+      this.executeDifference();
+      return;
+    }
+
     this.pendingOperation = 'difference';
-    this.clearSelection();
     this.map.getCanvas().style.cursor = 'pointer';
   }
 
@@ -1060,14 +1248,32 @@ export class GeoEditor implements IControl {
    */
   private executeSimplify(): void {
     const selected = this.getSelectedFeatures();
-    if (selected.length === 0) {
+    let targets = selected;
+
+    if (targets.length === 0 && this.lastCreatedFeature) {
+      targets = [this.lastCreatedFeature];
+    }
+
+    if (targets.length === 0) {
       console.warn('Select a feature to simplify');
       return;
     }
 
-    const feature = selected[0];
-    const result = this.simplifyFeature.simplifyWithStats(feature);
-    this.handleSimplifyResult(result);
+    const results = targets.map((feature) => this.simplifyFeature.simplifyWithStats(feature));
+    const shouldBatch = results.length > 1;
+
+    results.forEach((result) => {
+      if (!result) return;
+      this.applySimplifyResult(result, {
+        clearSelection: !shouldBatch,
+        disableModes: !shouldBatch,
+      });
+    });
+
+    if (shouldBatch) {
+      this.clearSelection();
+      this.disableAllModes();
+    }
   }
 
   // ============================================================================
@@ -1104,6 +1310,7 @@ export class GeoEditor implements IControl {
       pasted.forEach((feature) => {
         this.geoman?.features.importGeoJsonFeature(feature);
         this.options.onFeatureCreate?.(feature);
+        this.lastCreatedFeature = feature;
       });
     }
 
@@ -1151,6 +1358,8 @@ export class GeoEditor implements IControl {
       const geomanData = s.geomanData ?? this.findGeomanDataForFeature(s.feature);
       this.deleteGeomanFeatureData(geomanData, s.id);
       this.options.onFeatureDelete?.(s.id);
+      this.lastDeletedFeature = s.feature;
+      this.lastDeletedFeatureId = s.id;
     });
 
     this.clearSelection();
@@ -1190,6 +1399,8 @@ export class GeoEditor implements IControl {
       if (fallbackId) {
         this.options.onFeatureDelete?.(fallbackId);
       }
+      this.lastDeletedFeature = feature;
+      this.lastDeletedFeatureId = fallbackId ?? null;
     });
   }
 
@@ -1242,6 +1453,7 @@ export class GeoEditor implements IControl {
       result.parts.forEach((part) => {
         this.geoman?.features.importGeoJsonFeature(part);
         this.options.onFeatureCreate?.(part);
+        this.lastCreatedFeature = part;
       });
     }
 
@@ -1264,6 +1476,7 @@ export class GeoEditor implements IControl {
     if (this.geoman) {
       this.geoman.features.importGeoJsonFeature(result.result);
       this.options.onFeatureCreate?.(result.result);
+      this.lastCreatedFeature = result.result;
     }
 
     this.emitEvent('gm:union', result);
@@ -1285,6 +1498,7 @@ export class GeoEditor implements IControl {
     if (result.result && this.geoman) {
       this.geoman.features.importGeoJsonFeature(result.result);
       this.options.onFeatureCreate?.(result.result);
+      this.lastCreatedFeature = result.result;
     }
 
     this.emitEvent('gm:difference', result);
@@ -1292,21 +1506,33 @@ export class GeoEditor implements IControl {
   }
 
   private handleSimplifyResult(result: SimplifyResult): void {
+    this.applySimplifyResult(result, { clearSelection: true, disableModes: true });
+  }
+
+  private applySimplifyResult(
+    result: SimplifyResult,
+    options: { clearSelection: boolean; disableModes: boolean }
+  ): void {
     // Remove original feature
     this.deleteGeomanFeatures([result.original]);
     this.clearGeomanTemporaryFeatures();
-    this.clearSelection();
 
     // Add simplified feature
     if (this.geoman) {
       result.result.id = this.getGeomanIdFromFeature(result.original) ?? result.result.id;
       this.geoman.features.importGeoJsonFeature(result.result);
       this.options.onFeatureEdit?.(result.result, result.original);
+      this.lastEditedFeature = result.result;
     }
 
     this.emitEvent('gm:simplify', result);
-    this.clearSelection();
-    this.disableAllModes();
+
+    if (options.clearSelection) {
+      this.clearSelection();
+    }
+    if (options.disableModes) {
+      this.disableAllModes();
+    }
   }
 
   private handleLassoResult(result: LassoResult): void {
@@ -1729,7 +1955,7 @@ export class GeoEditor implements IControl {
       split: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M14 4l2.29 2.29-2.88 2.88 1.42 1.42 2.88-2.88L20 10V4h-6zm-4 0H4v6l2.29-2.29 4.71 4.7V20h2v-8.41l-5.29-5.3L10 4z" fill="currentColor"/></svg>',
       union: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zm-9 9h7v7H4v-7zm9 0h7v7h-7v-7z" fill="currentColor"/></svg>',
       difference: '<svg viewBox="0 0 24 24" width="18" height="18"><rect x="4" y="4" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"/><rect x="10" y="10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 7h6v2h-6z" fill="currentColor"/></svg>',
-      simplify: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" fill="currentColor"/></svg>',
+      simplify: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 17l5-5 3 3 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 6h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
       lasso: '<svg viewBox="0 0 24 24" width="18" height="18"><ellipse cx="12" cy="10" rx="8" ry="6" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2"/><circle cx="12" cy="18" r="3" fill="currentColor"/></svg>',
       freehand: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
       circle_marker: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>',
@@ -1796,6 +2022,7 @@ export class GeoEditor implements IControl {
     this.geoman.setGlobalEventsListener((event) => {
       // Handle feature creation
       if (event.type === 'gm:create' && event.feature) {
+        this.lastCreatedFeature = event.feature;
         this.options.onFeatureCreate?.(event.feature);
       }
 
