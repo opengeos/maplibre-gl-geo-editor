@@ -279,6 +279,10 @@ export interface GeomanInstance {
   disableDraw: () => void;
   toggleDraw: (shape: DrawMode) => void;
   drawEnabled: (shape?: DrawMode) => boolean;
+  enableMode: (modeType: 'draw' | 'edit' | 'helper', mode: string) => void;
+  disableMode: (modeType: 'draw' | 'edit' | 'helper', mode: string) => void;
+  toggleMode: (modeType: 'draw' | 'edit' | 'helper', mode: string) => void;
+  isModeEnabled: (modeType: 'draw' | 'edit' | 'helper', mode: string) => boolean;
   enableGlobalEditMode: () => void;
   disableGlobalEditMode: () => void;
   toggleGlobalEditMode: () => void;
@@ -313,6 +317,8 @@ export interface GeomanFeatureData {
   shape: string;
   geoJson?: Feature;
   getGeoJson?: () => Feature;
+  updateGeometry?: (geometry: Geometry) => void;
+  updateGeoJsonGeometry?: (geometry: Geometry) => void;
   delete: () => void;
 }
 

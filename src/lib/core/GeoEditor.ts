@@ -14,6 +14,7 @@ import type {
   DifferenceResult,
   SimplifyResult,
   LassoResult,
+  ScaleHandlePosition,
 } from './types';
 import { DEFAULT_OPTIONS, CSS_PREFIX, ADVANCED_EDIT_MODES, INTERNAL_IDS } from './constants';
 import {
@@ -51,6 +52,9 @@ export class GeoEditor implements IControl {
   // Event listeners
   private boundKeyHandler: ((e: KeyboardEvent) => void) | null = null;
   private boundClickHandler: ((e: MapMouseEvent) => void) | null = null;
+  private boundScaleMouseDown: ((e: MapMouseEvent) => void) | null = null;
+  private boundScaleMouseMove: ((e: MapMouseEvent) => void) | null = null;
+  private boundScaleMouseUp: ((e: MapMouseEvent) => void) | null = null;
 
   // Selection mode state
   private isSelectMode: boolean = false;
@@ -60,6 +64,13 @@ export class GeoEditor implements IControl {
 
   // Snapping state (independent of other modes)
   private snappingEnabled: boolean = false;
+
+  // Scale mode state
+  private isScaling: boolean = false;
+  private scaleTargetFeature: Feature | null = null;
+  private scaleTargetGeomanData: GeomanFeatureData | null = null;
+  private scaleStartFeature: Feature | null = null;
+  private scaleDragPanEnabled: boolean | null = null;
 
   // Toolbar element reference
   private toolbar: HTMLDivElement | null = null;
@@ -115,6 +126,7 @@ export class GeoEditor implements IControl {
 
     // Setup selection handler
     this.setupSelectionHandler();
+    this.setupScaleHandler();
 
     // Setup geoman event listener if geoman is available
     this.setupGeomanEvents();
@@ -128,6 +140,7 @@ export class GeoEditor implements IControl {
   onRemove(): void {
     this.removeKeyboardShortcuts();
     this.removeSelectionHandler();
+    this.removeScaleHandler();
     this.disableAllModes();
 
     // Cleanup feature handlers
@@ -149,6 +162,7 @@ export class GeoEditor implements IControl {
   setGeoman(geoman: GeomanInstance): void {
     this.geoman = geoman;
     this.setupGeomanEvents();
+    this.applySnappingState();
 
     // Hide geoman control if option is set
     if (this.options.hideGeomanControl) {
@@ -346,6 +360,12 @@ export class GeoEditor implements IControl {
     if (!this.geoman) return null;
 
     let foundData: GeomanFeatureData | null = null;
+    const targetId = String(
+      targetFeature.id ??
+        (targetFeature.properties as { __gm_id?: string | number } | undefined)?.__gm_id ??
+        (targetFeature.properties as { id?: string | number } | undefined)?.id ??
+        ''
+    );
 
     try {
       this.geoman.features.forEach((fd) => {
@@ -355,7 +375,11 @@ export class GeoEditor implements IControl {
         if (!feature) return;
 
         // Match by ID or by geometry
-        if (feature.id === targetFeature.id) {
+        if (
+          (targetId && String(feature.id) === targetId) ||
+          (targetId &&
+            String((feature.properties as { __gm_id?: string | number } | undefined)?.__gm_id) === targetId)
+        ) {
           foundData = fd;
         } else if (JSON.stringify(feature.geometry) === JSON.stringify(targetFeature.geometry)) {
           foundData = fd;
@@ -393,16 +417,174 @@ export class GeoEditor implements IControl {
   }
 
   /**
+   * Setup mouse handlers for scale mode
+   */
+  private setupScaleHandler(): void {
+    this.boundScaleMouseDown = (e: MapMouseEvent) => {
+      if (this.state.activeEditMode !== 'scale') {
+        return;
+      }
+
+      const handle = this.getScaleHandleFromEvent(e);
+      if (!handle || !this.scaleTargetFeature || !this.scaleTargetGeomanData) {
+        return;
+      }
+
+      e.preventDefault();
+      this.isScaling = true;
+      this.scaleStartFeature = this.scaleTargetFeature;
+      this.disableScaleDragPan();
+      this.scaleFeature.startScale(
+        this.scaleTargetFeature,
+        handle,
+        [e.lngLat.lng, e.lngLat.lat],
+        (scaled, factor) => {
+          this.applyScaledFeature(scaled);
+          this.emitEvent('gm:scale', { feature: scaled, scaleFactor: factor });
+        }
+      );
+      this.emitEvent('gm:scalestart', { feature: this.scaleTargetFeature });
+    };
+
+    this.boundScaleMouseMove = (e: MapMouseEvent) => {
+      if (!this.isScaling) {
+        return;
+      }
+
+      const scaled = this.scaleFeature.updateScale([e.lngLat.lng, e.lngLat.lat]);
+      if (scaled) {
+        this.applyScaledFeature(scaled);
+      }
+    };
+
+    this.boundScaleMouseUp = () => {
+      if (!this.isScaling) {
+        return;
+      }
+
+      this.isScaling = false;
+      const result = this.scaleFeature.endScale();
+      this.restoreScaleDragPan();
+
+      if (result) {
+        this.applyScaledFeature(result.feature);
+        if (this.scaleStartFeature) {
+          this.options.onFeatureEdit?.(result.feature, this.scaleStartFeature);
+        }
+        this.scaleFeature.showHandlesForFeature(result.feature);
+        this.bringScaleHandlesToFront();
+        this.emitEvent('gm:scaleend', {
+          feature: result.feature,
+          scaleFactor: result.factor,
+        });
+      }
+
+      this.scaleStartFeature = null;
+    };
+
+    this.map.on('mousedown', this.boundScaleMouseDown);
+    this.map.on('mousemove', this.boundScaleMouseMove);
+    this.map.on('mouseup', this.boundScaleMouseUp);
+  }
+
+  /**
+   * Remove scale handlers
+   */
+  private removeScaleHandler(): void {
+    if (this.boundScaleMouseDown) {
+      this.map.off('mousedown', this.boundScaleMouseDown);
+      this.boundScaleMouseDown = null;
+    }
+    if (this.boundScaleMouseMove) {
+      this.map.off('mousemove', this.boundScaleMouseMove);
+      this.boundScaleMouseMove = null;
+    }
+    if (this.boundScaleMouseUp) {
+      this.map.off('mouseup', this.boundScaleMouseUp);
+      this.boundScaleMouseUp = null;
+    }
+  }
+
+  private getScaleHandleFromEvent(e: MapMouseEvent): ScaleHandlePosition | null {
+    if (!this.map.getLayer(INTERNAL_IDS.SCALE_HANDLES_LAYER)) {
+      return null;
+    }
+
+    const hits = this.map.queryRenderedFeatures(e.point, {
+      layers: [INTERNAL_IDS.SCALE_HANDLES_LAYER],
+    });
+    if (!hits.length) {
+      return null;
+    }
+
+    const position = hits[0].properties?.position;
+    if (typeof position === 'string') {
+      return position as ScaleHandlePosition;
+    }
+
+    return null;
+  }
+
+  private disableScaleDragPan(): void {
+    this.scaleDragPanEnabled = this.map.dragPan.isEnabled();
+    if (this.scaleDragPanEnabled) {
+      this.map.dragPan.disable();
+    }
+  }
+
+  private restoreScaleDragPan(): void {
+    if (this.scaleDragPanEnabled) {
+      this.map.dragPan.enable();
+    }
+    this.scaleDragPanEnabled = null;
+  }
+
+  private applyScaledFeature(feature: Feature): void {
+    if (this.scaleTargetGeomanData?.updateGeometry) {
+      this.scaleTargetGeomanData.updateGeometry(feature.geometry);
+    } else if (this.scaleTargetGeomanData?.updateGeoJsonGeometry) {
+      this.scaleTargetGeomanData.updateGeoJsonGeometry(feature.geometry);
+    }
+
+    if (this.state.selectedFeatures.length > 0) {
+      const current = this.state.selectedFeatures[0];
+      this.state.selectedFeatures[0] = {
+        ...current,
+        id: String(this.scaleTargetGeomanData?.id ?? feature.id ?? current.id),
+        feature,
+        geomanData: this.scaleTargetGeomanData ?? current.geomanData,
+      };
+      this.scaleTargetFeature = feature;
+    }
+
+    this.updateSelectionHighlight();
+    this.bringScaleHandlesToFront();
+  }
+
+  private bringScaleHandlesToFront(): void {
+    if (!this.map.getLayer(INTERNAL_IDS.SCALE_HANDLES_LAYER)) {
+      return;
+    }
+
+    try {
+      this.map.moveLayer(INTERNAL_IDS.SCALE_HANDLES_LAYER);
+    } catch {
+      // Ignore move errors
+    }
+  }
+
+  /**
    * Toggle feature in selection
    */
   private toggleFeatureSelection(feature: Feature, geomanData?: GeomanFeatureData): void {
-    const featureId = String(geomanData?.id ?? feature.id);
+    const resolvedGeomanData = geomanData ?? this.findGeomanDataForFeature(feature);
+    const featureId = String(resolvedGeomanData?.id ?? feature.id);
     const isSelected = this.state.selectedFeatures.some((s) => s.id === featureId);
 
     if (isSelected) {
       this.removeFromSelection(featureId);
     } else {
-      this.addToSelection(feature, geomanData);
+      this.addToSelection(feature, resolvedGeomanData);
     }
   }
 
@@ -529,6 +711,11 @@ export class GeoEditor implements IControl {
     this.lassoFeature.disable();
     this.splitFeature.cancelSplit();
     this.disableSelectMode();
+    this.restoreScaleDragPan();
+    this.isScaling = false;
+    this.scaleTargetFeature = null;
+    this.scaleTargetGeomanData = null;
+    this.scaleStartFeature = null;
 
     // Reset pending operation
     this.pendingOperation = null;
@@ -541,6 +728,7 @@ export class GeoEditor implements IControl {
     this.state.isDrawing = false;
     this.state.isEditing = false;
     this.updateToolbarState();
+    this.applySnappingState();
 
     // Note: snapping state is NOT reset here - it's independent
   }
@@ -698,11 +886,17 @@ export class GeoEditor implements IControl {
    * Select features
    */
   selectFeatures(features: Feature[], geomanDataList?: GeomanFeatureData[]): void {
+    const resolvedGeomanData =
+      geomanDataList && geomanDataList.length
+        ? geomanDataList
+        : features.map((feature) => this.findGeomanDataForFeature(feature));
+    const fallbackBase = Date.now();
+
     this.state.selectedFeatures = features.map((f, i) => ({
-      id: String(geomanDataList?.[i]?.id ?? f.id ?? Date.now()),
+      id: String(resolvedGeomanData?.[i]?.id ?? f.id ?? `${fallbackBase}-${i}`),
       feature: f,
       layerId: 'default',
-      geomanData: geomanDataList?.[i],
+      geomanData: resolvedGeomanData?.[i],
     }));
     this.updateSelectionHighlight();
     this.options.onSelectionChange?.(features);
@@ -712,7 +906,8 @@ export class GeoEditor implements IControl {
    * Add feature to selection
    */
   addToSelection(feature: Feature, geomanData?: GeomanFeatureData): void {
-    const featureId = String(geomanData?.id ?? feature.id);
+    const resolvedGeomanData = geomanData ?? this.findGeomanDataForFeature(feature);
+    const featureId = String(resolvedGeomanData?.id ?? feature.id);
     const exists = this.state.selectedFeatures.some(
       (s) => s.id === featureId
     );
@@ -721,7 +916,7 @@ export class GeoEditor implements IControl {
         id: featureId,
         feature,
         layerId: 'default',
-        geomanData,
+        geomanData: resolvedGeomanData,
       });
       this.updateSelectionHighlight();
       this.options.onSelectionChange?.(this.getSelectedFeatures());
@@ -756,10 +951,31 @@ export class GeoEditor implements IControl {
    * Enable scale mode
    */
   private enableScaleMode(): void {
+    this.scaleTargetFeature = null;
+    this.scaleTargetGeomanData = null;
+
     const selected = this.getSelectedFeatures();
     if (selected.length === 0) {
       console.warn('Select a feature to scale');
       return;
+    }
+
+    const geomanData = this.findGeomanDataForFeature(selected[0]);
+    if (!geomanData) {
+      console.warn('Selected feature is not managed by Geoman');
+      return;
+    }
+
+    this.scaleTargetFeature = selected[0];
+    this.scaleTargetGeomanData = geomanData;
+    this.scaleFeature.showHandlesForFeature(selected[0]);
+    this.bringScaleHandlesToFront();
+    if (this.state.selectedFeatures.length > 0) {
+      this.state.selectedFeatures[0] = {
+        ...this.state.selectedFeatures[0],
+        id: String(geomanData.id),
+        geomanData,
+      };
     }
 
     // Scale mode is interactive - the actual scaling happens in event handlers
@@ -923,10 +1139,11 @@ export class GeoEditor implements IControl {
     }
 
     selected.forEach((s) => {
+      const geomanData = s.geomanData ?? this.findGeomanDataForFeature(s.feature);
       // Use geoman data's delete method if available (most reliable)
-      if (s.geomanData?.delete) {
+      if (geomanData?.delete) {
         try {
-          s.geomanData.delete();
+          geomanData.delete();
         } catch {
           // Fallback to ID-based deletion
           this.deleteFeatureById(s.id);
@@ -1174,8 +1391,8 @@ export class GeoEditor implements IControl {
     const snappingBtn = document.createElement('button');
     snappingBtn.className = `${CSS_PREFIX}-tool-button`;
     snappingBtn.dataset.helper = 'snapping';
-    snappingBtn.title = 'Toggle Snapping (requires Geoman Pro for full functionality)';
-    snappingBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M20 6h-3V4c0-1.1-.9-2-2-2H9c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM9 4h6v2H9V4zm11 16H4V8h16v12z" fill="currentColor"/><circle cx="12" cy="14" r="3" fill="currentColor"/></svg>';
+    snappingBtn.title = 'Toggle Snapping';
+    snappingBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M7 3h4v6H7V3zm6 0h4v6h-4V3zM7 9h4v3a3 3 0 0 0 6 0V9h4v3a7 7 0 0 1-14 0V9z" fill="currentColor"/></svg>';
 
     // Set initial state from instance property
     if (this.snappingEnabled) {
@@ -1202,24 +1419,7 @@ export class GeoEditor implements IControl {
   toggleSnapping(): void {
     this.snappingEnabled = !this.snappingEnabled;
 
-    // Attempt to set snapping if Geoman supports it (Pro version)
-    if (this.geoman) {
-      try {
-        // Try to access snapping API if available (Geoman Pro)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const gm = this.geoman as any;
-        if (typeof gm.setGlobalOptions === 'function') {
-          gm.setGlobalOptions({ snapping: this.snappingEnabled });
-        } else if (typeof gm.enableSnapping === 'function' && this.snappingEnabled) {
-          gm.enableSnapping();
-        } else if (typeof gm.disableSnapping === 'function' && !this.snappingEnabled) {
-          gm.disableSnapping();
-        }
-      } catch {
-        // Snapping API not available in this version of Geoman
-        console.info('Snapping toggle: Geoman free version does not support snapping. Consider upgrading to Geoman Pro for full snapping functionality.');
-      }
-    }
+    this.applySnappingState();
   }
 
   /**
@@ -1234,6 +1434,37 @@ export class GeoEditor implements IControl {
    */
   setSnapping(enabled: boolean): void {
     this.snappingEnabled = enabled;
+    this.applySnappingState();
+  }
+
+  private applySnappingState(): void {
+    if (!this.geoman) {
+      return;
+    }
+
+    try {
+      if (typeof this.geoman.enableMode === 'function') {
+        if (this.snappingEnabled) {
+          this.geoman.enableMode('helper', 'snapping');
+        } else {
+          this.geoman.disableMode('helper', 'snapping');
+        }
+        return;
+      }
+
+      // Fallback for older APIs
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const gm = this.geoman as any;
+      if (typeof gm.setGlobalOptions === 'function') {
+        gm.setGlobalOptions({ snapping: this.snappingEnabled });
+      } else if (typeof gm.enableSnapping === 'function' && this.snappingEnabled) {
+        gm.enableSnapping();
+      } else if (typeof gm.disableSnapping === 'function' && !this.snappingEnabled) {
+        gm.disableSnapping();
+      }
+    } catch {
+      console.info('Snapping toggle: Geoman version does not support snapping.');
+    }
   }
 
   /**
@@ -1393,7 +1624,7 @@ export class GeoEditor implements IControl {
       copy: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" fill="currentColor"/></svg>',
       split: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M14 4l2.29 2.29-2.88 2.88 1.42 1.42 2.88-2.88L20 10V4h-6zm-4 0H4v6l2.29-2.29 4.71 4.7V20h2v-8.41l-5.29-5.3L10 4z" fill="currentColor"/></svg>',
       union: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zm-9 9h7v7H4v-7zm9 0h7v7h-7v-7z" fill="currentColor"/></svg>',
-      difference: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="currentColor"/></svg>',
+      difference: '<svg viewBox="0 0 24 24" width="18" height="18"><rect x="4" y="4" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"/><rect x="10" y="10" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 7h6v2h-6z" fill="currentColor"/></svg>',
       simplify: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" fill="currentColor"/></svg>',
       lasso: '<svg viewBox="0 0 24 24" width="18" height="18"><ellipse cx="12" cy="10" rx="8" ry="6" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2"/><circle cx="12" cy="18" r="3" fill="currentColor"/></svg>',
       freehand: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="none" stroke="currentColor" stroke-width="2"/></svg>',

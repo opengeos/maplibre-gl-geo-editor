@@ -135,6 +135,13 @@ export class ScaleFeature {
   }
 
   /**
+   * Show scale handles without starting a drag operation
+   */
+  showHandlesForFeature(feature: Feature): void {
+    this.showHandles(feature);
+  }
+
+  /**
    * Update scaling during drag
    */
   updateScale(currentPoint: Position): Feature | null {

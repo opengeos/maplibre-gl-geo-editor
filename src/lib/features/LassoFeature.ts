@@ -16,6 +16,9 @@ export class LassoFeature {
   private onCompleteCallback:
     | ((result: LassoResult) => void)
     | null = null;
+  private dragPanEnabled: boolean | null = null;
+  private boxZoomEnabled: boolean | null = null;
+  private doubleClickZoomEnabled: boolean | null = null;
 
   // Bound event handlers
   private handleMouseDown: ((e: MapMouseEvent) => void) | null = null;
@@ -42,6 +45,7 @@ export class LassoFeature {
     if (!this.map) return;
 
     this.onCompleteCallback = onComplete || null;
+    this.disableMapInteractions();
     this.setupLassoLayers();
     this.attachEventListeners();
 
@@ -58,6 +62,7 @@ export class LassoFeature {
     this.isDrawing = false;
     this.points = [];
     this.onCompleteCallback = null;
+    this.restoreMapInteractions();
 
     if (this.map) {
       this.map.getCanvas().style.cursor = '';
@@ -163,6 +168,7 @@ export class LassoFeature {
     if (!this.map) return;
 
     this.handleMouseDown = (e: MapMouseEvent) => {
+      e.preventDefault();
       this.isDrawing = true;
       this.points = [[e.lngLat.lng, e.lngLat.lat]];
       this.updateLassoVisualization();
@@ -171,6 +177,7 @@ export class LassoFeature {
     this.handleMouseMove = (e: MapMouseEvent) => {
       if (!this.isDrawing) return;
 
+      e.preventDefault();
       this.points.push([e.lngLat.lng, e.lngLat.lat]);
       this.updateLassoVisualization();
     };
@@ -264,6 +271,47 @@ export class LassoFeature {
     if (source) {
       source.setData(turf.featureCollection([]));
     }
+  }
+
+  private disableMapInteractions(): void {
+    if (!this.map) return;
+
+    this.dragPanEnabled = this.map.dragPan.isEnabled();
+    if (this.dragPanEnabled) {
+      this.map.dragPan.disable();
+    }
+
+    if (this.map.boxZoom) {
+      this.boxZoomEnabled = this.map.boxZoom.isEnabled();
+      if (this.boxZoomEnabled) {
+        this.map.boxZoom.disable();
+      }
+    }
+
+    if (this.map.doubleClickZoom) {
+      this.doubleClickZoomEnabled = this.map.doubleClickZoom.isEnabled();
+      if (this.doubleClickZoomEnabled) {
+        this.map.doubleClickZoom.disable();
+      }
+    }
+  }
+
+  private restoreMapInteractions(): void {
+    if (!this.map) return;
+
+    if (this.dragPanEnabled) {
+      this.map.dragPan.enable();
+    }
+    if (this.boxZoomEnabled && this.map.boxZoom) {
+      this.map.boxZoom.enable();
+    }
+    if (this.doubleClickZoomEnabled && this.map.doubleClickZoom) {
+      this.map.doubleClickZoom.enable();
+    }
+
+    this.dragPanEnabled = null;
+    this.boxZoomEnabled = null;
+    this.doubleClickZoomEnabled = null;
   }
 
   /**
