@@ -318,7 +318,7 @@ export interface GeomanInstance {
   enableDraw: (shape: DrawMode) => void;
   disableDraw: () => void;
   toggleDraw: (shape: DrawMode) => void;
-  drawEnabled: (shape?: DrawMode) => boolean;
+  drawEnabled: (shape: DrawMode) => boolean;
   enableMode: (modeType: 'draw' | 'edit' | 'helper', mode: string) => void;
   disableMode: (modeType: 'draw' | 'edit' | 'helper', mode: string) => void;
   toggleMode: (modeType: 'draw' | 'edit' | 'helper', mode: string) => void;
