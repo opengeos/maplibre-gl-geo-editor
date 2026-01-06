@@ -361,7 +361,7 @@ export class GeoEditor implements IControl {
       });
       const feature = this.getGeomanFeature(geomanData);
 
-      if (feature) {
+      if (feature && geomanData) {
         return { feature, geomanData };
       }
     } catch {
@@ -763,7 +763,7 @@ export class GeoEditor implements IControl {
     if (isSelected) {
       this.removeFromSelection(featureId);
     } else {
-      this.addToSelection(feature, resolvedGeomanData);
+      this.addToSelection(feature, resolvedGeomanData ?? undefined);
     }
   }
 
@@ -1133,7 +1133,7 @@ export class GeoEditor implements IControl {
       id: String(resolvedGeomanData?.[i]?.id ?? f.id ?? `${fallbackBase}-${i}`),
       feature: f,
       layerId: 'default',
-      geomanData: resolvedGeomanData?.[i],
+      geomanData: resolvedGeomanData?.[i] ?? undefined,
     }));
     this.updateSelectionHighlight();
     this.options.onSelectionChange?.(features);
@@ -1154,7 +1154,7 @@ export class GeoEditor implements IControl {
         id: featureId,
         feature,
         layerId: 'default',
-        geomanData: resolvedGeomanData,
+        geomanData: resolvedGeomanData ?? undefined,
       });
       this.updateSelectionHighlight();
       this.options.onSelectionChange?.(this.getSelectedFeatures());
@@ -1588,10 +1588,6 @@ export class GeoEditor implements IControl {
 
     this.emitEvent('gm:difference', result);
     this.disableAllModes();
-  }
-
-  private handleSimplifyResult(result: SimplifyResult): void {
-    this.applySimplifyResult(result, { clearSelection: true, disableModes: true });
   }
 
   private applySimplifyResult(

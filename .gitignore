@@ -30,6 +30,7 @@ coverage
 # Build
 dist/
 dist-examples/
+.vite/
 
 # Environment
 .env
