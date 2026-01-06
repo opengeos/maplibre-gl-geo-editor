@@ -203,7 +203,8 @@ export class GeoEditor implements IControl {
   /**
    * Set the Geoman instance for integration
    */
-  setGeoman(geoman: GeomanInstance): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setGeoman(geoman: any): void {
     this.geoman = geoman;
     this.setupGeomanEvents();
     this.applySnappingState();
