@@ -7,6 +7,6 @@
     "outDir": "dist/types",
     "allowImportingTsExtensions": false
   },
-  "include": ["src/lib"],
+  "include": ["src"],
   "exclude": ["**/*.test.ts", "**/*.test.tsx", "tests"]
 }

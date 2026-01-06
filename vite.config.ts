@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     dts({
-      include: ['src/lib'],
+      include: ['src'],
       outDir: 'dist/types',
       rollupTypes: true,
     }),
