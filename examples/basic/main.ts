@@ -73,6 +73,8 @@ map.on('load', () => {
         'simplify',
         'lasso',
       ],
+      fileModes: ['open', 'save'],
+      saveFilename: 'my-features.geojson',
       onFeatureCreate: (feature) => {
         console.log('Feature created:', feature);
       },
@@ -87,6 +89,12 @@ map.on('load', () => {
       },
       onModeChange: (mode) => {
         console.log('Mode changed:', mode);
+      },
+      onGeoJsonLoad: (result) => {
+        console.log(`Loaded ${result.count} features from ${result.filename}`);
+      },
+      onGeoJsonSave: (result) => {
+        console.log(`Saved ${result.count} features to ${result.filename}`);
       },
     });
 
@@ -125,6 +133,14 @@ map.on('load', () => {
 
     container.addEventListener('gm:lassoend', (e) => {
       console.log('Lasso selection:', (e as CustomEvent).detail);
+    });
+
+    container.addEventListener('gm:geojsonload', (e) => {
+      console.log('GeoJSON loaded:', (e as CustomEvent).detail);
+    });
+
+    container.addEventListener('gm:geojsonsave', (e) => {
+      console.log('GeoJSON saved:', (e as CustomEvent).detail);
     });
 
     // Add some sample features for demonstration

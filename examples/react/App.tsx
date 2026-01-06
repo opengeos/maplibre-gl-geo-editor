@@ -158,9 +158,20 @@ function App() {
             'simplify',
             'lasso',
           ]}
+          fileModes={['open', 'save']}
+          saveFilename="my-features.geojson"
           onFeatureCreate={handleFeatureCreate}
           onFeatureDelete={handleFeatureDelete}
           onSelectionChange={handleSelectionChange}
+          onGeoJsonLoad={(result) => {
+            console.log('Loaded:', result);
+            if (geoman) {
+              updateFeatureCount(geoman as unknown as Geoman);
+            }
+          }}
+          onGeoJsonSave={(result) => {
+            console.log('Saved:', result);
+          }}
         />
       )}
 
@@ -198,6 +209,9 @@ function App() {
           </p>
           <p style={{ marginBottom: 8 }}>
             <strong>Advanced:</strong> Union, Split, Simplify, etc.
+          </p>
+          <p style={{ marginBottom: 8 }}>
+            <strong>File:</strong> Open/Save GeoJSON files
           </p>
           <p>
             <strong>Shortcuts:</strong> Ctrl+C (copy), Ctrl+V (paste), Del

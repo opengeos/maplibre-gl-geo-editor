@@ -15,6 +15,8 @@ import type {
   SimplifyResult,
   LassoResult,
   ScaleHandlePosition,
+  GeoJsonLoadResult,
+  GeoJsonSaveResult,
 } from './types';
 import { DEFAULT_OPTIONS, CSS_PREFIX, ADVANCED_EDIT_MODES, INTERNAL_IDS } from './constants';
 import {
@@ -91,6 +93,9 @@ export class GeoEditor implements IControl {
   // Toolbar element reference
   private toolbar: HTMLDivElement | null = null;
 
+  // Hidden file input for file dialog
+  private fileInput: HTMLInputElement | null = null;
+
   constructor(options: GeoEditorOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
@@ -137,6 +142,9 @@ export class GeoEditor implements IControl {
     // Create toolbar
     this.createToolbar();
 
+    // Setup file input for file dialog
+    this.setupFileInput();
+
     // Setup keyboard shortcuts
     this.setupKeyboardShortcuts();
 
@@ -165,6 +173,12 @@ export class GeoEditor implements IControl {
     this.scaleFeature.destroy();
     this.lassoFeature.destroy();
     this.splitFeature.destroy();
+
+    // Cleanup file input
+    if (this.fileInput && this.fileInput.parentNode) {
+      this.fileInput.parentNode.removeChild(this.fileInput);
+      this.fileInput = null;
+    }
 
     if (this.container.parentNode) {
       this.container.parentNode.removeChild(this.container);
@@ -1683,6 +1697,12 @@ export class GeoEditor implements IControl {
       toolsWrapper.appendChild(helperGroup);
     }
 
+    // File tools group (open/save GeoJSON)
+    if (this.options.fileModes && this.options.fileModes.length > 0) {
+      const fileGroup = this.createFileToolsGroup();
+      toolsWrapper.appendChild(fileGroup);
+    }
+
     const resetGroup = this.createResetToolsGroup();
     toolsWrapper.appendChild(resetGroup);
 
@@ -1820,6 +1840,194 @@ export class GeoEditor implements IControl {
     buttons.appendChild(resetBtn);
     group.appendChild(buttons);
     return group;
+  }
+
+  /**
+   * Create file tools group (open/save GeoJSON)
+   */
+  private createFileToolsGroup(): HTMLElement {
+    const group = document.createElement('div');
+    group.className = `${CSS_PREFIX}-tool-group`;
+
+    if (this.options.showLabels) {
+      const groupLabel = document.createElement('div');
+      groupLabel.className = `${CSS_PREFIX}-tool-group-label`;
+      groupLabel.textContent = 'File';
+      group.appendChild(groupLabel);
+    }
+
+    const buttons = document.createElement('div');
+    buttons.className = `${CSS_PREFIX}-tool-buttons`;
+
+    // Open button
+    if (this.options.fileModes.includes('open')) {
+      const openBtn = document.createElement('button');
+      openBtn.className = `${CSS_PREFIX}-tool-button`;
+      openBtn.dataset.file = 'open';
+      openBtn.title = 'Open GeoJSON file';
+      openBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z" fill="currentColor"/></svg>';
+      openBtn.addEventListener('click', () => this.openFileDialog());
+      buttons.appendChild(openBtn);
+    }
+
+    // Save button
+    if (this.options.fileModes.includes('save')) {
+      const saveBtn = document.createElement('button');
+      saveBtn.className = `${CSS_PREFIX}-tool-button`;
+      saveBtn.dataset.file = 'save';
+      saveBtn.title = 'Save GeoJSON file';
+      saveBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M17 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm2 16H5V5h11.17L19 7.83V19zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zM6 6h9v4H6V6z" fill="currentColor"/></svg>';
+      saveBtn.addEventListener('click', () => this.saveGeoJson());
+      buttons.appendChild(saveBtn);
+    }
+
+    group.appendChild(buttons);
+    return group;
+  }
+
+  /**
+   * Setup hidden file input for file dialog
+   */
+  private setupFileInput(): void {
+    this.fileInput = document.createElement('input');
+    this.fileInput.type = 'file';
+    this.fileInput.accept = '.geojson,.json,application/geo+json,application/json';
+    this.fileInput.style.display = 'none';
+    this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+    document.body.appendChild(this.fileInput);
+  }
+
+  /**
+   * Open file dialog to select GeoJSON file
+   */
+  openFileDialog(): void {
+    if (this.fileInput) {
+      this.fileInput.click();
+    }
+  }
+
+  /**
+   * Handle file selection from file dialog
+   */
+  private handleFileSelect(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const geoJson = JSON.parse(content);
+        this.loadGeoJson(geoJson, file.name);
+      } catch (error) {
+        console.error('GeoEditor: Failed to parse GeoJSON file:', error);
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset the input so the same file can be selected again
+    input.value = '';
+  }
+
+  /**
+   * Load GeoJSON data into the editor
+   * @param geoJson - FeatureCollection or Feature to load
+   * @param filename - Optional filename for logging
+   * @returns Result of the load operation
+   */
+  loadGeoJson(geoJson: FeatureCollection | Feature, filename: string = 'loaded.geojson'): GeoJsonLoadResult {
+    if (!this.geoman) {
+      throw new Error('Geoman not initialized');
+    }
+
+    // Clear existing features
+    try {
+      this.geoman.features.deleteAll();
+    } catch {
+      // Fallback: delete features one by one
+      this.geoman.features.forEach((fd) => {
+        try {
+          fd.delete();
+        } catch {
+          /* ignore */
+        }
+      });
+    }
+    this.clearSelection();
+
+    // Normalize to FeatureCollection
+    let featureCollection: FeatureCollection;
+    if (geoJson.type === 'Feature') {
+      featureCollection = {
+        type: 'FeatureCollection',
+        features: [geoJson as Feature],
+      };
+    } else if (geoJson.type === 'FeatureCollection') {
+      featureCollection = geoJson as FeatureCollection;
+    } else {
+      throw new Error('Invalid GeoJSON: expected Feature or FeatureCollection');
+    }
+
+    // Import the features
+    const importResult = this.geoman.features.importGeoJson(featureCollection);
+
+    const result: GeoJsonLoadResult = {
+      features: featureCollection.features,
+      count: importResult.success,
+      filename,
+    };
+
+    // Call callback
+    this.options.onGeoJsonLoad?.(result);
+
+    // Emit event
+    this.emitEvent('gm:geojsonload', result);
+
+    console.log(`GeoEditor: Loaded ${result.count} features from ${filename}`);
+
+    return result;
+  }
+
+  /**
+   * Save current features as GeoJSON file download
+   * @param filename - Optional filename for download
+   * @returns Result of the save operation
+   */
+  saveGeoJson(filename?: string): GeoJsonSaveResult {
+    const featureCollection = this.getFeatures();
+    const saveFilename = filename || this.options.saveFilename || 'features.geojson';
+
+    // Create blob and download
+    const blob = new Blob([JSON.stringify(featureCollection, null, 2)], {
+      type: 'application/geo+json',
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = saveFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    const result: GeoJsonSaveResult = {
+      featureCollection,
+      count: featureCollection.features.length,
+      filename: saveFilename,
+    };
+
+    // Call callback
+    this.options.onGeoJsonSave?.(result);
+
+    // Emit event
+    this.emitEvent('gm:geojsonsave', result);
+
+    console.log(`GeoEditor: Saved ${result.count} features to ${saveFilename}`);
+
+    return result;
   }
 
   /**
