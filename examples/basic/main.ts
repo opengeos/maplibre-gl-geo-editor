@@ -47,6 +47,7 @@ map.on('load', () => {
       position: 'top-left',
       collapsed: false,
       toolbarOrientation: 'vertical',
+      columns: 2,
       showLabels: false,
       showFeatureProperties: true,
       drawModes: [
