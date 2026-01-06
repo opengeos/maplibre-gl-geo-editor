@@ -108,9 +108,12 @@ export class FreehandFeature {
     if (this.points.length < this.options.minPoints) return null;
 
     try {
-      // Simplify the points to reduce complexity
-      let coords = this.points;
+      // Remove duplicate consecutive points
+      let coords = this.removeDuplicatePoints(this.points);
 
+      if (coords.length < this.options.minPoints) return null;
+
+      // Simplify the points to reduce complexity
       if (coords.length > 10) {
         // Create a temporary line to simplify
         const tempLine = turf.lineString(coords);
@@ -121,22 +124,72 @@ export class FreehandFeature {
         coords = simplified.geometry.coordinates as Position[];
       }
 
+      // Remove duplicates again after simplification
+      coords = this.removeDuplicatePoints(coords);
+
       if (this.options.type === 'polygon') {
         // Ensure we have enough points for a polygon
         if (coords.length < 3) return null;
 
-        // Close the polygon
-        const closedCoords = [...coords, coords[0]];
-        return turf.polygon([closedCoords]);
+        // Remove any existing closing point (if last point equals first)
+        while (
+          coords.length > 3 &&
+          this.arePointsEqual(coords[0], coords[coords.length - 1])
+        ) {
+          coords = coords.slice(0, -1);
+        }
+
+        // Ensure we still have enough points
+        if (coords.length < 3) return null;
+
+        // Create deep copies of coordinates to avoid reference issues
+        const cleanCoords: Position[] = coords.map((c) => [c[0], c[1]]);
+
+        // Close the polygon with a new copy of the first point (not a reference)
+        const closingPoint: Position = [cleanCoords[0][0], cleanCoords[0][1]];
+        const closedCoords = [...cleanCoords, closingPoint];
+
+        // Create the polygon and clean it
+        const polygon = turf.polygon([closedCoords]);
+
+        // Use cleanCoords to remove any redundant coordinates
+        return turf.cleanCoords(polygon) as Feature<Polygon>;
       } else {
         // Line
         if (coords.length < 2) return null;
-        return turf.lineString(coords);
+        // Create deep copies for line as well
+        const cleanCoords: Position[] = coords.map((c) => [c[0], c[1]]);
+        return turf.lineString(cleanCoords);
       }
     } catch (error) {
       console.warn('FreehandFeature: Error building feature:', error);
       return null;
     }
+  }
+
+  /**
+   * Remove duplicate consecutive points
+   */
+  private removeDuplicatePoints(points: Position[]): Position[] {
+    if (points.length <= 1) return points;
+
+    const result: Position[] = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+      if (!this.arePointsEqual(points[i], points[i - 1])) {
+        result.push(points[i]);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Check if two points are equal (or very close)
+   */
+  private arePointsEqual(p1: Position, p2: Position): boolean {
+    const tolerance = 0.0000001; // Very small tolerance for floating point comparison
+    return (
+      Math.abs(p1[0] - p2[0]) < tolerance && Math.abs(p1[1] - p2[1]) < tolerance
+    );
   }
 
   /**
