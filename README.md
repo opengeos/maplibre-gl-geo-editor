@@ -3,7 +3,8 @@
 A powerful MapLibre GL plugin for creating and editing geometries. Extends the free [Geoman](https://geoman.io/docs/maplibre/) control with advanced editing features including Union, Split, Scale, Difference, Simplify, Copy, and Lasso selection.
 
 [![npm version](https://img.shields.io/npm/v/maplibre-gl-geo-editor.svg)](https://www.npmjs.com/package/maplibre-gl-geo-editor)
-[![license](https://img.shields.io/npm/l/maplibre-gl-geo-editor.svg)](https://github.com/opengeos/maplibre-gl-geo-editor/blob/main/LICENSE)
+[![npm downloads](https://img.shields.io/npm/dm/maplibre-gl-geo-editor.svg)](https://www.npmjs.com/package/maplibre-gl-geo-editor)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
