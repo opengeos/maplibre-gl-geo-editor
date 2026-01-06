@@ -319,6 +319,7 @@ export interface GeomanFeatureData {
   getGeoJson?: () => Feature;
   updateGeometry?: (geometry: Geometry) => void;
   updateGeoJsonGeometry?: (geometry: Geometry) => void;
+  temporary?: boolean;
   delete: () => void;
 }
 
@@ -326,6 +327,7 @@ export interface GeomanFeaturesAPI {
   getAll: () => FeatureCollection;
   get: (sourceName: string, featureId: string) => GeomanFeatureData | null;
   forEach: (callback: (feature: GeomanFeatureData) => void) => void;
+  tmpForEach?: (callback: (feature: GeomanFeatureData) => void) => void;
   has: (sourceName: string, featureId: string) => boolean;
   delete: (featureData: GeomanFeatureData) => void;
   deleteAll: () => void;

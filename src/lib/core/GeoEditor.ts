@@ -1120,7 +1120,12 @@ export class GeoEditor implements IControl {
       // Try to find and delete the feature
       this.geoman.features.forEach((fd) => {
         const feature = this.getGeomanFeature(fd);
-        if (String(fd.id) === featureId || String(feature?.id) === featureId) {
+        const featureProps = feature?.properties as { __gm_id?: string | number } | undefined;
+        if (
+          String(fd.id) === featureId ||
+          String(feature?.id) === featureId ||
+          String(featureProps?.__gm_id) === featureId
+        ) {
           fd.delete();
         }
       });
@@ -1157,6 +1162,35 @@ export class GeoEditor implements IControl {
     this.clearSelection();
   }
 
+  private clearGeomanTemporaryFeatures(): void {
+    if (!this.geoman) return;
+
+    try {
+      if (typeof this.geoman.features.tmpForEach === 'function') {
+        this.geoman.features.tmpForEach((fd) => {
+          try {
+            fd.delete();
+          } catch {
+            // Ignore delete errors for temporary features
+          }
+        });
+        return;
+      }
+
+      this.geoman.features.forEach((fd) => {
+        if (fd.temporary) {
+          try {
+            fd.delete();
+          } catch {
+            // Ignore delete errors for temporary features
+          }
+        }
+      });
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+
   // ============================================================================
   // Result Handlers
   // ============================================================================
@@ -1169,6 +1203,7 @@ export class GeoEditor implements IControl {
 
     // Remove original feature using stored geoman data
     this.deleteSelectedFeatures();
+    this.clearGeomanTemporaryFeatures();
 
     // Add new parts
     if (this.geoman) {
@@ -1190,6 +1225,7 @@ export class GeoEditor implements IControl {
 
     // Remove original features using stored geoman data
     this.deleteSelectedFeatures();
+    this.clearGeomanTemporaryFeatures();
 
     // Add merged feature
     if (this.geoman) {
@@ -1209,6 +1245,7 @@ export class GeoEditor implements IControl {
 
     // Remove original features using stored geoman data
     this.deleteSelectedFeatures();
+    this.clearGeomanTemporaryFeatures();
 
     // Add result if not null (complete subtraction)
     if (result.result && this.geoman) {
@@ -1224,6 +1261,7 @@ export class GeoEditor implements IControl {
     // Remove original feature
     const originalId = String(result.original.id);
     this.deleteFeatureById(originalId);
+    this.clearGeomanTemporaryFeatures();
 
     // Add simplified feature
     if (this.geoman) {
@@ -1303,6 +1341,9 @@ export class GeoEditor implements IControl {
       const helperGroup = this.createHelperToolsGroup();
       toolsWrapper.appendChild(helperGroup);
     }
+
+    const resetGroup = this.createResetToolsGroup();
+    toolsWrapper.appendChild(resetGroup);
 
     this.toolbar.appendChild(toolsWrapper);
 
@@ -1407,6 +1448,35 @@ export class GeoEditor implements IControl {
     });
 
     buttons.appendChild(snappingBtn);
+    group.appendChild(buttons);
+    return group;
+  }
+
+  private createResetToolsGroup(): HTMLElement {
+    const group = document.createElement('div');
+    group.className = `${CSS_PREFIX}-tool-group`;
+
+    if (this.options.showLabels) {
+      const groupLabel = document.createElement('div');
+      groupLabel.className = `${CSS_PREFIX}-tool-group-label`;
+      groupLabel.textContent = 'Reset';
+      group.appendChild(groupLabel);
+    }
+
+    const buttons = document.createElement('div');
+    buttons.className = `${CSS_PREFIX}-tool-buttons`;
+
+    const resetBtn = document.createElement('button');
+    resetBtn.className = `${CSS_PREFIX}-tool-button`;
+    resetBtn.title = 'Clear selection and disable tools';
+    resetBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 5a7 7 0 1 1-6.32 4H3l3.5-3.5L10 9H7.74A5 5 0 1 0 12 7v2l3-3-3-3v2z" fill="currentColor"/></svg>';
+    resetBtn.addEventListener('click', () => {
+      this.disableAllModes();
+      this.clearSelection();
+      this.updateToolbarState();
+    });
+
+    buttons.appendChild(resetBtn);
     group.appendChild(buttons);
     return group;
   }
@@ -1614,7 +1684,7 @@ export class GeoEditor implements IControl {
       rectangle: '<svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="5" width="18" height="14" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
       circle: '<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
       marker: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
-      select: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 5l6 6V5H3zm12 0v6l6-6h-6zM9 19l-6-6v6h6zm6 0h6v-6l-6 6z" fill="currentColor"/><path d="M12 8l-4 8h8l-4-8z" fill="currentColor"/></svg>',
+      select: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 3l6 14 2-6 6-2L4 3z" fill="currentColor"/><path d="M12.5 13.5l4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
       drag: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z" fill="currentColor"/></svg>',
       change: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg>',
       rotate: '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/></svg>',
