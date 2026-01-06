@@ -1312,11 +1312,17 @@ export class GeoEditor implements IControl {
       return;
     }
 
-    const results = targets.map((feature) => this.simplifyFeature.simplifyWithStats(feature));
+    const results = targets
+      .map((feature) => this.getSimplifyResult(feature))
+      .filter((result): result is SimplifyResult => Boolean(result));
     const shouldBatch = results.length > 1;
 
+    if (results.length === 0) {
+      console.warn('Simplify: no vertices removed with current tolerance');
+      return;
+    }
+
     results.forEach((result) => {
-      if (!result) return;
       this.applySimplifyResult(result, {
         clearSelection: !shouldBatch,
         disableModes: !shouldBatch,
@@ -1328,6 +1334,26 @@ export class GeoEditor implements IControl {
       this.clearSelection();
       this.disableAllModes();
     }
+  }
+
+  private getSimplifyResult(feature: Feature): SimplifyResult | null {
+    const base = this.simplifyFeature.simplifyWithStats(feature);
+    if (base.verticesAfter < base.verticesBefore) {
+      return base;
+    }
+
+    const tolerances = this.simplifyFeature.getSuggestedTolerances(feature);
+    for (const tolerance of tolerances) {
+      if (tolerance === this.options.simplifyTolerance) {
+        continue;
+      }
+      const result = this.simplifyFeature.simplifyWithStats(feature, { tolerance });
+      if (result.verticesAfter < result.verticesBefore) {
+        return result;
+      }
+    }
+
+    return null;
   }
 
   // ============================================================================
