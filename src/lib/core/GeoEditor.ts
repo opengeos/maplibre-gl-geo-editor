@@ -1923,6 +1923,15 @@ export class GeoEditor implements IControl {
         this.loadGeoJson(geoJson, file.name);
       } catch (error) {
         console.error('GeoEditor: Failed to parse GeoJSON file:', error);
+
+        const errorInfo = {
+          filename: file.name,
+          message: error instanceof Error ? error.message : String(error),
+          error,
+        };
+
+        // Emit an event so applications can provide user-facing error feedback
+        this.emitEvent('gm:geojsonloaderror', errorInfo);
       }
     };
     reader.readAsText(file);
