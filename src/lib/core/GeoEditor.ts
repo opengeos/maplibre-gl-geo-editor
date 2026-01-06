@@ -1,4 +1,5 @@
 import type { IControl, Map as MapLibreMap, MapMouseEvent, GeoJSONSource } from 'maplibre-gl';
+import maplibregl from 'maplibre-gl';
 import type { Feature, FeatureCollection, Polygon, LineString, Point } from 'geojson';
 import * as turf from '@turf/turf';
 import type {
@@ -96,6 +97,9 @@ export class GeoEditor implements IControl {
   // Hidden file input for file dialog
   private fileInput: HTMLInputElement | null = null;
 
+  // Feature properties popup
+  private propertiesPopup: maplibregl.Popup | null = null;
+
   constructor(options: GeoEditorOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
@@ -168,6 +172,9 @@ export class GeoEditor implements IControl {
     this.removeScaleHandler();
     this.removeMultiDragHandler();
     this.disableAllModes();
+
+    // Cleanup popup
+    this.hideFeaturePropertiesPopup();
 
     // Cleanup feature handlers
     this.scaleFeature.destroy();
@@ -1152,6 +1159,13 @@ export class GeoEditor implements IControl {
     this.updateSelectionHighlight();
     this.options.onSelectionChange?.(features);
     this.logSelectedFeatureCollection('selected');
+
+    // Show popup for single selected feature in select mode
+    if (features.length === 1 && this.isSelectMode) {
+      this.showFeaturePropertiesPopup(features[0]);
+    } else {
+      this.hideFeaturePropertiesPopup();
+    }
   }
 
   /**
@@ -1194,8 +1208,88 @@ export class GeoEditor implements IControl {
   clearSelection(): void {
     this.state.selectedFeatures = [];
     this.updateSelectionHighlight();
+    this.hideFeaturePropertiesPopup();
     this.options.onSelectionChange?.([]);
     this.logSelectedFeatureCollection('selected');
+  }
+
+  // ============================================================================
+  // Feature Properties Popup
+  // ============================================================================
+
+  /**
+   * Show popup with feature properties
+   */
+  private showFeaturePropertiesPopup(feature: Feature): void {
+    if (!this.options.showFeatureProperties) return;
+    if (!feature.properties || Object.keys(feature.properties).length === 0) return;
+
+    // Remove existing popup
+    this.hideFeaturePropertiesPopup();
+
+    // Calculate popup position (centroid of the feature)
+    const centroid = turf.centroid(feature);
+    const coordinates = centroid.geometry.coordinates as [number, number];
+
+    // Format properties as HTML
+    const html = this.formatPropertiesHtml(feature.properties);
+
+    // Create popup
+    this.propertiesPopup = new maplibregl.Popup({
+      maxWidth: '300px',
+      closeButton: true,
+      closeOnClick: false,
+      className: 'geo-editor-properties-popup',
+    })
+      .setLngLat(coordinates)
+      .setHTML(html)
+      .addTo(this.map);
+  }
+
+  /**
+   * Hide feature properties popup
+   */
+  private hideFeaturePropertiesPopup(): void {
+    if (this.propertiesPopup) {
+      this.propertiesPopup.remove();
+      this.propertiesPopup = null;
+    }
+  }
+
+  /**
+   * Format feature properties as HTML table
+   */
+  private formatPropertiesHtml(properties: Record<string, unknown>): string {
+    const entries = Object.entries(properties).filter(
+      ([key]) => !key.startsWith('__') // Filter out internal properties
+    );
+
+    if (entries.length === 0) {
+      return '<div class="geo-editor-popup-empty">No properties</div>';
+    }
+
+    const rows = entries
+      .map(([key, value]) => {
+        const displayValue =
+          value === null || value === undefined
+            ? '<em>null</em>'
+            : typeof value === 'object'
+              ? this.escapeHtml(JSON.stringify(value))
+              : this.escapeHtml(String(value));
+        return `<tr><td class="geo-editor-popup-key">${this.escapeHtml(key)}</td><td class="geo-editor-popup-value">${displayValue}</td></tr>`;
+      })
+      .join('');
+
+    return `<table class="geo-editor-popup-table"><tbody>${rows}</tbody></table>`;
+  }
+
+  /**
+   * Escape HTML special characters
+   */
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   // ============================================================================
@@ -1988,6 +2082,11 @@ export class GeoEditor implements IControl {
       filename,
     };
 
+    // Fit bounds to show all features
+    if (this.options.fitBoundsOnLoad && featureCollection.features.length > 0) {
+      this.fitBoundsToFeatures(featureCollection);
+    }
+
     // Call callback
     this.options.onGeoJsonLoad?.(result);
 
@@ -1997,6 +2096,64 @@ export class GeoEditor implements IControl {
     console.log(`GeoEditor: Loaded ${result.count} features from ${filename}`);
 
     return result;
+  }
+
+  /**
+   * Fit the map bounds to show all features in a FeatureCollection
+   */
+  private fitBoundsToFeatures(featureCollection: FeatureCollection): void {
+    if (!featureCollection.features || featureCollection.features.length === 0) {
+      return;
+    }
+
+    try {
+      // Calculate bounding box using turf.bbox
+      const bbox = turf.bbox(featureCollection) as [number, number, number, number];
+
+      // Check if bbox is valid (not infinite or NaN)
+      if (!this.isValidBBox(bbox)) {
+        console.warn('GeoEditor: Invalid bounding box for loaded features');
+        return;
+      }
+
+      // Convert to LngLatBoundsLike format: [[west, south], [east, north]]
+      const bounds: [[number, number], [number, number]] = [
+        [bbox[0], bbox[1]], // southwest
+        [bbox[2], bbox[3]], // northeast
+      ];
+
+      // Apply fitBounds with configured options
+      this.map.fitBounds(bounds, {
+        padding: 50,
+        maxZoom: 18,
+        duration: 500,
+      });
+    } catch (error) {
+      console.warn('GeoEditor: Failed to fit bounds to features:', error);
+    }
+  }
+
+  /**
+   * Check if a bounding box is valid
+   */
+  private isValidBBox(bbox: [number, number, number, number]): boolean {
+    return (
+      bbox.every((v) => isFinite(v) && !isNaN(v)) &&
+      bbox[0] <= bbox[2] && // west <= east
+      bbox[1] <= bbox[3] // south <= north
+    );
+  }
+
+  /**
+   * Fit the map to show all current features
+   */
+  fitToAllFeatures(): void {
+    const featureCollection = this.getFeatures();
+    if (featureCollection.features.length === 0) {
+      console.warn('GeoEditor: No features to fit bounds to');
+      return;
+    }
+    this.fitBoundsToFeatures(featureCollection);
   }
 
   /**

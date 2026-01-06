@@ -85,6 +85,8 @@ export const DEFAULT_OPTIONS: GeoEditorOptionsRequired = {
   onModeChange: () => {},
   onGeoJsonLoad: () => {},
   onGeoJsonSave: () => {},
+  showFeatureProperties: false,
+  fitBoundsOnLoad: true,
 };
 
 /**

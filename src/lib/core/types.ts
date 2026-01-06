@@ -96,6 +96,10 @@ export interface GeoEditorOptions {
   onGeoJsonLoad?: (result: GeoJsonLoadResult) => void;
   /** Callback when GeoJSON is saved */
   onGeoJsonSave?: (result: GeoJsonSaveResult) => void;
+  /** Show feature properties in a popup when selected (default: false) */
+  showFeatureProperties?: boolean;
+  /** Auto-fit map bounds when GeoJSON is loaded (default: true) */
+  fitBoundsOnLoad?: boolean;
 }
 
 export type GeoEditorOptionsRequired = Required<GeoEditorOptions>;
