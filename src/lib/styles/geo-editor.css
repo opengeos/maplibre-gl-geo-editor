@@ -478,6 +478,50 @@
 }
 
 /* ============================================================================
+   Feature Properties Popup
+   ============================================================================ */
+
+.geo-editor-properties-popup .maplibregl-popup-content {
+  padding: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.geo-editor-popup-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+.geo-editor-popup-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.geo-editor-popup-table tr:last-child td {
+  border-bottom: none;
+}
+
+.geo-editor-popup-key {
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.geo-editor-popup-value {
+  color: #666;
+  word-break: break-word;
+}
+
+.geo-editor-popup-empty {
+  color: #999;
+  font-style: italic;
+  padding: 8px;
+  text-align: center;
+}
+
+/* ============================================================================
    Responsive Adjustments
    ============================================================================ */
 

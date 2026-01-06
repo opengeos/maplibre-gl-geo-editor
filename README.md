@@ -14,6 +14,7 @@ A powerful MapLibre GL plugin for creating and editing geometries. Extends the f
 - **Rectangle** - Draw rectangles
 - **Circle** - Draw circles
 - **Marker** - Place point markers
+- **Freehand** - Draw shapes by dragging (custom implementation)
 
 ### Basic Edit Tools (via Geoman Free)
 - **Drag** - Move features on the map
@@ -23,6 +24,7 @@ A powerful MapLibre GL plugin for creating and editing geometries. Extends the f
 - **Delete** - Remove selected features (supports multi-select)
 
 ### Advanced Edit Tools (Custom Implementation)
+- **Select** - Click to select features (shows properties popup when enabled)
 - **Scale** - Resize features with interactive handles
 - **Copy** - Duplicate features (Ctrl+C/V support)
 - **Split** - Split polygons/lines with a drawn line
@@ -33,7 +35,7 @@ A powerful MapLibre GL plugin for creating and editing geometries. Extends the f
 - **Reset** - Clear selection and disable active tools (toolbar button)
 
 ### File Operations
-- **Open** - Load GeoJSON file from disk
+- **Open** - Load GeoJSON file from disk (auto-zooms to extent when enabled)
 - **Save** - Download current features as GeoJSON file
 
 ## Installation
@@ -72,11 +74,13 @@ map.on('load', () => {
     const geoEditor = new GeoEditor({
       position: 'top-left',
       toolbarOrientation: 'vertical',
-      drawModes: ['polygon', 'line', 'rectangle', 'circle', 'marker'],
+      drawModes: ['polygon', 'line', 'rectangle', 'circle', 'marker', 'freehand'],
       editModes: [
-        'drag', 'change', 'rotate', 'cut', 'delete',
+        'select', 'drag', 'change', 'rotate', 'cut', 'delete',
         'scale', 'copy', 'split', 'union', 'difference', 'simplify', 'lasso'
       ],
+      showFeatureProperties: true,  // Show popup with properties on selection
+      fitBoundsOnLoad: true,        // Auto-zoom to extent when loading GeoJSON
       onFeatureCreate: (feature) => console.log('Created:', feature),
       onSelectionChange: (features) => console.log('Selected:', features.length),
     });
@@ -134,8 +138,10 @@ function App() {
           map={map}
           geoman={geoman}
           position="top-left"
-          drawModes={['polygon', 'line', 'marker']}
-          editModes={['drag', 'change', 'scale', 'copy', 'union', 'split']}
+          drawModes={['polygon', 'line', 'marker', 'freehand']}
+          editModes={['select', 'drag', 'change', 'scale', 'copy', 'union', 'split']}
+          showFeatureProperties={true}
+          fitBoundsOnLoad={true}
         />
       )}
     </div>
@@ -158,6 +164,8 @@ function App() {
 | `showLabels` | `boolean` | `false` | Show text labels on buttons |
 | `simplifyTolerance` | `number` | `0.001` | Default simplification tolerance |
 | `saveFilename` | `string` | `'features.geojson'` | Default filename for saving |
+| `showFeatureProperties` | `boolean` | `false` | Show popup with feature properties when selected |
+| `fitBoundsOnLoad` | `boolean` | `true` | Auto-zoom to extent when loading GeoJSON |
 | `onFeatureCreate` | `(feature) => void` | - | Callback when feature is created |
 | `onFeatureEdit` | `(feature, oldFeature) => void` | - | Callback when feature is edited |
 | `onFeatureDelete` | `(featureId) => void` | - | Callback when feature is deleted |
@@ -193,6 +201,9 @@ geoEditor.getAllFeatureCollection();
 geoEditor.openFileDialog();           // Open file picker dialog
 geoEditor.loadGeoJson(geoJson);       // Load GeoJSON programmatically
 geoEditor.saveGeoJson('filename.geojson'); // Save/download GeoJSON
+
+// Map view
+geoEditor.fitToAllFeatures();         // Zoom map to show all features
 
 // Operation snapshots
 geoEditor.getLastCreatedFeature();
@@ -261,6 +272,7 @@ import {
   DifferenceFeature,
   ScaleFeature,
   SplitFeature,
+  FreehandFeature,
 } from 'maplibre-gl-geo-editor';
 
 // Union polygons

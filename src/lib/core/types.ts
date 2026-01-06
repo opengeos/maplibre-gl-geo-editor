@@ -16,6 +16,10 @@ import type { MapMouseEvent, MapTouchEvent } from 'maplibre-gl';
 // Draw and Edit Mode Types
 // ============================================================================
 
+/**
+ * Available draw modes.
+ * Note: 'freehand' is implemented as a custom feature (not dependent on Geoman Pro).
+ */
 export type DrawMode =
   | 'marker'
   | 'circle'
@@ -25,7 +29,7 @@ export type DrawMode =
   | 'line'
   | 'rectangle'
   | 'polygon'
-  | 'freehand';
+  | 'freehand'; // Custom implementation
 
 export type EditMode =
   | 'drag'
@@ -96,6 +100,10 @@ export interface GeoEditorOptions {
   onGeoJsonLoad?: (result: GeoJsonLoadResult) => void;
   /** Callback when GeoJSON is saved */
   onGeoJsonSave?: (result: GeoJsonSaveResult) => void;
+  /** Show feature properties in a popup when selected (default: false) */
+  showFeatureProperties?: boolean;
+  /** Auto-fit map bounds when GeoJSON is loaded (default: true) */
+  fitBoundsOnLoad?: boolean;
 }
 
 export type GeoEditorOptionsRequired = Required<GeoEditorOptions>;

@@ -48,6 +48,7 @@ map.on('load', () => {
       collapsed: false,
       toolbarOrientation: 'vertical',
       showLabels: false,
+      showFeatureProperties: true,
       drawModes: [
         'polygon',
         'line',
