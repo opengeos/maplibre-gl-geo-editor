@@ -1,0 +1,56 @@
+// Core exports
+export { GeoEditor } from './lib/core/GeoEditor';
+export type {
+  GeoEditorOptions,
+  GeoEditorState,
+  DrawMode,
+  EditMode,
+  HelperMode,
+  ToolbarPosition,
+  ToolbarOrientation,
+  SelectedFeature,
+  ScaleOptions,
+  SimplifyOptions,
+  CopyOptions,
+  SplitOptions,
+  UnionOptions,
+  DifferenceOptions,
+  LassoOptions,
+  SplitResult,
+  UnionResult,
+  DifferenceResult,
+  SimplifyResult,
+  LassoResult,
+  ScaleHandle,
+  ScaleHandlePosition,
+  GeomanInstance,
+  GeomanFeaturesAPI,
+  GeoEditorEventMap,
+  GeoEditorEventType,
+} from './lib/core/types';
+
+// Feature exports
+export {
+  CopyFeature,
+  SimplifyFeature,
+  UnionFeature,
+  DifferenceFeature,
+  ScaleFeature,
+  LassoFeature,
+  SplitFeature,
+} from './lib/features';
+
+// Utility exports
+export * from './lib/utils';
+
+// Constants
+export {
+  DEFAULT_DRAW_MODES,
+  DEFAULT_EDIT_MODES,
+  ADVANCED_EDIT_MODES,
+  DEFAULT_OPTIONS,
+  CSS_PREFIX,
+} from './lib/core/constants';
+
+// Import CSS (for bundlers that support it)
+import './lib/styles/geo-editor.css';
