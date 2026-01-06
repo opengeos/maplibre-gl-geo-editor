@@ -4,21 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GeoEditor - CDN Example</title>
-    <!-- MapLibre GL CSS -->
+
+    <!-- MapLibre GL CSS and JS -->
     <link
+      rel="stylesheet"
       href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css"
-      rel="stylesheet"
     />
-    <!-- Geoman CSS -->
+    <script src="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.js"></script>
+
+    <!-- Geoman CSS and JS -->
     <link
-      href="https://unpkg.com/@geoman-io/maplibre-geoman-free@0.6.1/dist/maplibre-geoman.css"
       rel="stylesheet"
+      href="https://unpkg.com/@geoman-io/maplibre-geoman-free@0.6.1/dist/maplibre-geoman.css"
     />
+    <script src="https://unpkg.com/@geoman-io/maplibre-geoman-free@0.6.1/dist/maplibre-geoman.umd.js"></script>
+
     <!-- GeoEditor CSS -->
     <link
-      href="https://unpkg.com/maplibre-gl-geo-editor/dist/maplibre-gl-geo-editor.css"
       rel="stylesheet"
+      href="https://unpkg.com/maplibre-gl-geo-editor@0.1.0/dist/maplibre-gl-geo-editor.css"
     />
+
     <style>
       * {
         margin: 0;
@@ -78,7 +84,7 @@
     <div class="info-panel">
       <h3>CDN Usage Example</h3>
       <p style="font-size: 12px; color: #666; margin-bottom: 12px">
-        This example loads all dependencies via CDN using ES modules.
+        This example loads all dependencies via CDN. No build step required.
       </p>
       <h3>Draw Tools</h3>
       <ul>
@@ -103,22 +109,13 @@
       </ul>
     </div>
 
-    <script type="importmap">
-      {
-        "imports": {
-          "maplibre-gl": "https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.js",
-          "@geoman-io/maplibre-geoman-free": "https://unpkg.com/@geoman-io/maplibre-geoman-free@0.6.1/dist/maplibre-geoman.mjs",
-          "maplibre-gl-geo-editor": "https://unpkg.com/maplibre-gl-geo-editor/dist/index.mjs"
-        }
-      }
-    </script>
-
     <script type="module">
-      import maplibregl from 'maplibre-gl';
-      import { Geoman } from '@geoman-io/maplibre-geoman-free';
-      import { GeoEditor } from 'maplibre-gl-geo-editor';
+      // Import GeoEditor from CDN (pinned version)
+      import { GeoEditor } from 'https://unpkg.com/maplibre-gl-geo-editor@0.1.0/dist/index.mjs';
 
-      // Create the map
+      console.log('GeoEditor imported:', GeoEditor);
+
+      // Create the map (maplibregl is available globally)
       const map = new maplibregl.Map({
         container: 'map',
         style: {
@@ -145,12 +142,16 @@
 
       // Wait for map to load
       map.on('load', () => {
-        // Initialize Geoman
-        const geoman = new Geoman(map, {});
+        console.log('Map loaded');
+        console.log('Geoman global:', typeof Geoman, Geoman);
+
+        // Initialize Geoman (available globally as Geoman.Geoman)
+        const geoman = new Geoman.Geoman(map, {});
+        console.log('Geoman instance created:', geoman);
 
         // Wait for Geoman to load
         map.on('gm:loaded', () => {
-          console.log('Geoman loaded');
+          console.log('Geoman loaded event fired');
 
           // Create GeoEditor control with all tools
           const geoEditor = new GeoEditor({
@@ -202,11 +203,15 @@
             },
           });
 
+          console.log('GeoEditor instance created:', geoEditor);
+
           // Connect GeoEditor with Geoman
           geoEditor.setGeoman(geoman);
+          console.log('Geoman connected to GeoEditor');
 
           // Add the control to the map
           map.addControl(geoEditor, 'top-left');
+          console.log('GeoEditor control added to map');
 
           // Add sample features
           geoman.features.importGeoJsonFeature({
