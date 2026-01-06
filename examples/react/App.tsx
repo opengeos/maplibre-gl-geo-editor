@@ -141,7 +141,6 @@ function App() {
             'marker',
             'circle_marker',
             'ellipse',
-            'freehand',
           ]}
           editModes={[
             'select',

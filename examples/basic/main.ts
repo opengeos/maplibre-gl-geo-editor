@@ -48,6 +48,7 @@ map.on('load', () => {
       collapsed: false,
       toolbarOrientation: 'vertical',
       showLabels: false,
+      showFeatureProperties: true,
       drawModes: [
         'polygon',
         'line',
@@ -56,7 +57,6 @@ map.on('load', () => {
         'marker',
         'circle_marker',
         'ellipse',
-        'freehand',
       ],
       editModes: [
         'select',
