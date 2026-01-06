@@ -57,6 +57,7 @@ map.on('load', () => {
         'marker',
         'circle_marker',
         'ellipse',
+        'freehand',
       ],
       editModes: [
         'select',

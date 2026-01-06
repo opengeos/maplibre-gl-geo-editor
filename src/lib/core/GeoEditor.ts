@@ -28,6 +28,7 @@ import {
   ScaleFeature,
   LassoFeature,
   SplitFeature,
+  FreehandFeature,
 } from '../features';
 import { getPolygonFeatures } from '../utils/selectionUtils';
 import { isPolygon, isLine } from '../utils/geometryUtils';
@@ -51,6 +52,7 @@ export class GeoEditor implements IControl {
   private scaleFeature: ScaleFeature;
   private lassoFeature: LassoFeature;
   private splitFeature: SplitFeature;
+  private freehandFeature: FreehandFeature;
 
   // Event listeners
   private boundKeyHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -126,6 +128,7 @@ export class GeoEditor implements IControl {
     this.scaleFeature = new ScaleFeature();
     this.lassoFeature = new LassoFeature();
     this.splitFeature = new SplitFeature();
+    this.freehandFeature = new FreehandFeature();
   }
 
   /**
@@ -138,6 +141,7 @@ export class GeoEditor implements IControl {
     this.scaleFeature.init(map);
     this.lassoFeature.init(map);
     this.splitFeature.init(map);
+    this.freehandFeature.init(map);
 
     // Create container
     this.container = document.createElement('div');
@@ -180,6 +184,7 @@ export class GeoEditor implements IControl {
     this.scaleFeature.destroy();
     this.lassoFeature.destroy();
     this.splitFeature.destroy();
+    this.freehandFeature.destroy();
 
     // Cleanup file input
     if (this.fileInput && this.fileInput.parentNode) {
@@ -879,7 +884,10 @@ export class GeoEditor implements IControl {
   enableDrawMode(mode: DrawMode): void {
     this.disableAllModes();
 
-    if (this.geoman) {
+    // Handle freehand with our custom implementation (not available in Geoman free)
+    if (mode === 'freehand') {
+      this.enableFreehandMode();
+    } else if (this.geoman) {
       this.geoman.enableDraw(mode);
     }
 
@@ -887,6 +895,32 @@ export class GeoEditor implements IControl {
     this.state.isDrawing = true;
     this.options.onModeChange?.(mode);
     this.updateToolbarState();
+  }
+
+  /**
+   * Enable freehand drawing mode (custom implementation)
+   */
+  private enableFreehandMode(): void {
+    this.freehandFeature.enable((result) => {
+      if (result.success && result.feature && this.geoman) {
+        // Import the drawn feature into Geoman
+        const imported = this.geoman.features.importGeoJsonFeature(result.feature);
+        if (imported) {
+          // Trigger feature create callback
+          this.options.onFeatureCreate?.(result.feature);
+          this.emitEvent('gm:create', { feature: result.feature });
+        }
+      }
+      // Keep freehand mode active for continuous drawing
+      // User can switch modes via toolbar
+    });
+  }
+
+  /**
+   * Disable freehand drawing mode
+   */
+  private disableFreehandMode(): void {
+    this.freehandFeature.disable();
   }
 
   /**
@@ -943,6 +977,7 @@ export class GeoEditor implements IControl {
     this.scaleFeature.cancelScale();
     this.lassoFeature.disable();
     this.splitFeature.cancelSplit();
+    this.disableFreehandMode();
     this.disableSelectMode();
     this.restoreScaleDragPan();
     this.restoreMultiDragPan();

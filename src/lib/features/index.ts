@@ -5,3 +5,4 @@ export { DifferenceFeature } from './DifferenceFeature';
 export { ScaleFeature } from './ScaleFeature';
 export { LassoFeature } from './LassoFeature';
 export { SplitFeature } from './SplitFeature';
+export { FreehandFeature } from './FreehandFeature';

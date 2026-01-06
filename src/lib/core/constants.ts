@@ -108,6 +108,9 @@ export const INTERNAL_IDS = {
   SELECTION_SOURCE: 'geo-editor-selection-source',
   SELECTION_FILL_LAYER: 'geo-editor-selection-fill-layer',
   SELECTION_LINE_LAYER: 'geo-editor-selection-line-layer',
+  FREEHAND_SOURCE: 'geo-editor-freehand-source',
+  FREEHAND_FILL_LAYER: 'geo-editor-freehand-fill-layer',
+  FREEHAND_LINE_LAYER: 'geo-editor-freehand-line-layer',
 } as const;
 
 /**

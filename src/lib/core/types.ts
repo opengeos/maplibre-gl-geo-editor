@@ -18,7 +18,7 @@ import type { MapMouseEvent, MapTouchEvent } from 'maplibre-gl';
 
 /**
  * Available draw modes.
- * Note: 'freehand' requires Geoman Pro license and is not available in the free version.
+ * Note: 'freehand' is implemented as a custom feature (not dependent on Geoman Pro).
  */
 export type DrawMode =
   | 'marker'
@@ -29,7 +29,7 @@ export type DrawMode =
   | 'line'
   | 'rectangle'
   | 'polygon'
-  | 'freehand'; // Requires Geoman Pro
+  | 'freehand'; // Custom implementation
 
 export type EditMode =
   | 'drag'
