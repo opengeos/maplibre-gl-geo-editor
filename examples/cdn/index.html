@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GeoEditor - CDN Example</title>
+    <!-- MapLibre GL CSS -->
+    <link
+      href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css"
+      rel="stylesheet"
+    />
+    <!-- Geoman CSS -->
+    <link
+      href="https://unpkg.com/@geoman-io/maplibre-geoman-free@0.6.1/dist/maplibre-geoman.css"
+      rel="stylesheet"
+    />
+    <!-- GeoEditor CSS -->
+    <link
+      href="https://unpkg.com/maplibre-gl-geo-editor/dist/maplibre-gl-geo-editor.css"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          'Helvetica Neue', Arial, sans-serif;
+      }
+      #map {
+        width: 100vw;
+        height: 100vh;
+      }
+      .info-panel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: white;
+        padding: 16px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        max-width: 300px;
+        z-index: 1000;
+      }
+      .info-panel h3 {
+        margin-bottom: 12px;
+        font-size: 14px;
+        color: #333;
+      }
+      .info-panel ul {
+        list-style: none;
+        font-size: 12px;
+        color: #666;
+      }
+      .info-panel li {
+        margin-bottom: 6px;
+        padding-left: 16px;
+        position: relative;
+      }
+      .info-panel li::before {
+        content: '•';
+        position: absolute;
+        left: 0;
+        color: #3388ff;
+      }
+      .info-panel code {
+        background: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div class="info-panel">
+      <h3>CDN Usage Example</h3>
+      <p style="font-size: 12px; color: #666; margin-bottom: 12px">
+        This example loads all dependencies via CDN using ES modules.
+      </p>
+      <h3>Draw Tools</h3>
+      <ul>
+        <li>Polygon, Line, Rectangle</li>
+        <li>Circle, Marker, Freehand</li>
+        <li>Ellipse, Circle Marker</li>
+      </ul>
+      <h3 style="margin-top: 12px">Edit Tools</h3>
+      <ul>
+        <li>Select, Drag, Edit, Rotate</li>
+        <li>Cut, Delete, Scale, Copy</li>
+        <li>Split, Union, Difference</li>
+        <li>Simplify, Lasso</li>
+      </ul>
+      <h3 style="margin-top: 12px">Keyboard Shortcuts</h3>
+      <ul>
+        <li><code>Ctrl+C</code> Copy selected</li>
+        <li><code>Ctrl+V</code> Paste</li>
+        <li><code>Delete</code> Delete selected</li>
+        <li><code>Enter</code> Execute operation</li>
+        <li><code>Escape</code> Cancel / Clear</li>
+      </ul>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "maplibre-gl": "https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.js",
+          "@geoman-io/maplibre-geoman-free": "https://unpkg.com/@geoman-io/maplibre-geoman-free@0.6.1/dist/maplibre-geoman.mjs",
+          "maplibre-gl-geo-editor": "https://unpkg.com/maplibre-gl-geo-editor/dist/index.mjs"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import maplibregl from 'maplibre-gl';
+      import { Geoman } from '@geoman-io/maplibre-geoman-free';
+      import { GeoEditor } from 'maplibre-gl-geo-editor';
+
+      // Create the map
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: {
+          version: 8,
+          sources: {
+            osm: {
+              type: 'raster',
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '&copy; OpenStreetMap contributors',
+            },
+          },
+          layers: [
+            {
+              id: 'osm',
+              type: 'raster',
+              source: 'osm',
+            },
+          ],
+        },
+        center: [-122.4194, 37.7749],
+        zoom: 12,
+      });
+
+      // Wait for map to load
+      map.on('load', () => {
+        // Initialize Geoman
+        const geoman = new Geoman(map, {});
+
+        // Wait for Geoman to load
+        map.on('gm:loaded', () => {
+          console.log('Geoman loaded');
+
+          // Create GeoEditor control with all tools
+          const geoEditor = new GeoEditor({
+            position: 'top-left',
+            collapsed: false,
+            toolbarOrientation: 'vertical',
+            showLabels: false,
+            // All draw modes
+            drawModes: [
+              'polygon',
+              'line',
+              'rectangle',
+              'circle',
+              'marker',
+              'circle_marker',
+              'ellipse',
+              'freehand',
+            ],
+            // All edit modes
+            editModes: [
+              'select',
+              'drag',
+              'change',
+              'rotate',
+              'cut',
+              'delete',
+              'scale',
+              'copy',
+              'split',
+              'union',
+              'difference',
+              'simplify',
+              'lasso',
+            ],
+            onFeatureCreate: (feature) => {
+              console.log('Feature created:', feature);
+            },
+            onFeatureEdit: (feature, oldFeature) => {
+              console.log('Feature edited:', feature);
+            },
+            onFeatureDelete: (featureId) => {
+              console.log('Feature deleted:', featureId);
+            },
+            onSelectionChange: (features) => {
+              console.log('Selection changed:', features.length, 'features');
+            },
+            onModeChange: (mode) => {
+              console.log('Mode changed:', mode);
+            },
+          });
+
+          // Connect GeoEditor with Geoman
+          geoEditor.setGeoman(geoman);
+
+          // Add the control to the map
+          map.addControl(geoEditor, 'top-left');
+
+          // Add sample features
+          geoman.features.importGeoJsonFeature({
+            type: 'Feature',
+            id: 'sample-polygon',
+            properties: { name: 'Sample Polygon' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [-122.43, 37.79],
+                  [-122.43, 37.77],
+                  [-122.41, 37.77],
+                  [-122.41, 37.79],
+                  [-122.43, 37.79],
+                ],
+              ],
+            },
+          });
+
+          geoman.features.importGeoJsonFeature({
+            type: 'Feature',
+            id: 'sample-polygon-2',
+            properties: { name: 'Sample Polygon 2' },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [-122.42, 37.78],
+                  [-122.42, 37.76],
+                  [-122.4, 37.76],
+                  [-122.4, 37.78],
+                  [-122.42, 37.78],
+                ],
+              ],
+            },
+          });
+
+          console.log('GeoEditor initialized via CDN');
+        });
+      });
+
+      // Handle errors
+      map.on('error', (e) => {
+        console.error('Map error:', e);
+      });
+    </script>
+  </body>
+</html>

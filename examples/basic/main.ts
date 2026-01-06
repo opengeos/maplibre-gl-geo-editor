@@ -48,7 +48,16 @@ map.on('load', () => {
       collapsed: false,
       toolbarOrientation: 'vertical',
       showLabels: false,
-      drawModes: ['polygon', 'line', 'rectangle', 'circle', 'marker'],
+      drawModes: [
+        'polygon',
+        'line',
+        'rectangle',
+        'circle',
+        'marker',
+        'circle_marker',
+        'ellipse',
+        'freehand',
+      ],
       editModes: [
         'select',
         'drag',
