@@ -99,6 +99,11 @@
         <li>Split, Union, Difference</li>
         <li>Simplify, Lasso</li>
       </ul>
+      <h3 style="margin-top: 12px">File Tools</h3>
+      <ul>
+        <li>Open GeoJSON file</li>
+        <li>Save as GeoJSON</li>
+      </ul>
       <h3 style="margin-top: 12px">Keyboard Shortcuts</h3>
       <ul>
         <li><code>Ctrl+C</code> Copy selected</li>
@@ -186,6 +191,9 @@
               'simplify',
               'lasso',
             ],
+            // File modes
+            fileModes: ['open', 'save'],
+            saveFilename: 'my-features.geojson',
             onFeatureCreate: (feature) => {
               console.log('Feature created:', feature);
             },
@@ -200,6 +208,12 @@
             },
             onModeChange: (mode) => {
               console.log('Mode changed:', mode);
+            },
+            onGeoJsonLoad: (result) => {
+              console.log('GeoJSON loaded:', result);
+            },
+            onGeoJsonSave: (result) => {
+              console.log('GeoJSON saved:', result);
             },
           });
 

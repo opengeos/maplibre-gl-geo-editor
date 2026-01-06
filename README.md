@@ -32,6 +32,10 @@ A powerful MapLibre GL plugin for creating and editing geometries. Extends the f
 - **Lasso** - Select multiple features by drawing a polygon (supports union/difference/drag)
 - **Reset** - Clear selection and disable active tools (toolbar button)
 
+### File Operations
+- **Open** - Load GeoJSON file from disk
+- **Save** - Download current features as GeoJSON file
+
 ## Installation
 
 ```bash
@@ -149,14 +153,18 @@ function App() {
 | `collapsed` | `boolean` | `false` | Start with toolbar collapsed |
 | `drawModes` | `DrawMode[]` | All modes | Draw modes to enable |
 | `editModes` | `EditMode[]` | All modes | Edit modes to enable |
+| `fileModes` | `FileMode[]` | `['open', 'save']` | File operations to enable |
 | `toolbarOrientation` | `'vertical' \| 'horizontal'` | `'vertical'` | Toolbar layout |
 | `showLabels` | `boolean` | `false` | Show text labels on buttons |
 | `simplifyTolerance` | `number` | `0.001` | Default simplification tolerance |
+| `saveFilename` | `string` | `'features.geojson'` | Default filename for saving |
 | `onFeatureCreate` | `(feature) => void` | - | Callback when feature is created |
 | `onFeatureEdit` | `(feature, oldFeature) => void` | - | Callback when feature is edited |
 | `onFeatureDelete` | `(featureId) => void` | - | Callback when feature is deleted |
 | `onSelectionChange` | `(features) => void` | - | Callback when selection changes |
 | `onModeChange` | `(mode) => void` | - | Callback when mode changes |
+| `onGeoJsonLoad` | `(result) => void` | - | Callback when GeoJSON is loaded |
+| `onGeoJsonSave` | `(result) => void` | - | Callback when GeoJSON is saved |
 
 ### Methods
 
@@ -180,6 +188,11 @@ geoEditor.deleteSelectedFeatures();
 // Get all features
 geoEditor.getFeatures();
 geoEditor.getAllFeatureCollection();
+
+// File operations
+geoEditor.openFileDialog();           // Open file picker dialog
+geoEditor.loadGeoJson(geoJson);       // Load GeoJSON programmatically
+geoEditor.saveGeoJson('filename.geojson'); // Save/download GeoJSON
 
 // Operation snapshots
 geoEditor.getLastCreatedFeature();
@@ -210,6 +223,16 @@ map.getContainer().addEventListener('gm:simplify', (e) => {
 
 map.getContainer().addEventListener('gm:lassoend', (e) => {
   console.log('Lasso selection:', e.detail);
+});
+
+map.getContainer().addEventListener('gm:geojsonload', (e) => {
+  console.log('GeoJSON loaded:', e.detail);
+  // detail: { features, count, filename }
+});
+
+map.getContainer().addEventListener('gm:geojsonsave', (e) => {
+  console.log('GeoJSON saved:', e.detail);
+  // detail: { featureCollection, count, filename }
 });
 ```
 

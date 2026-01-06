@@ -3,6 +3,7 @@ import type {
   DrawMode,
   EditMode,
   HelperMode,
+  FileMode,
 } from './types';
 
 /**
@@ -56,6 +57,11 @@ export const ADVANCED_EDIT_MODES: EditMode[] = [
 export const DEFAULT_HELPER_MODES: HelperMode[] = ['snapping', 'measurements'];
 
 /**
+ * Default file modes
+ */
+export const DEFAULT_FILE_MODES: FileMode[] = ['open', 'save'];
+
+/**
  * Default options for GeoEditor
  */
 export const DEFAULT_OPTIONS: GeoEditorOptionsRequired = {
@@ -64,17 +70,21 @@ export const DEFAULT_OPTIONS: GeoEditorOptionsRequired = {
   drawModes: DEFAULT_DRAW_MODES,
   editModes: DEFAULT_EDIT_MODES,
   helperModes: DEFAULT_HELPER_MODES,
+  fileModes: DEFAULT_FILE_MODES,
   toolbarOrientation: 'vertical',
   showLabels: false,
   simplifyTolerance: 0.001,
   snappingEnabled: true,
   measurementsEnabled: false,
   hideGeomanControl: true,
+  saveFilename: 'features.geojson',
   onFeatureCreate: () => {},
   onFeatureEdit: () => {},
   onFeatureDelete: () => {},
   onSelectionChange: () => {},
   onModeChange: () => {},
+  onGeoJsonLoad: () => {},
+  onGeoJsonSave: () => {},
 };
 
 /**

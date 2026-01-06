@@ -45,6 +45,8 @@ export type EditMode =
 
 export type HelperMode = 'snapping' | 'measurements';
 
+export type FileMode = 'open' | 'save';
+
 export type ToolbarPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 export type ToolbarOrientation = 'vertical' | 'horizontal';
@@ -86,6 +88,14 @@ export interface GeoEditorOptions {
   onSelectionChange?: (features: Feature[]) => void;
   /** Callback when mode changes */
   onModeChange?: (mode: DrawMode | EditMode | null) => void;
+  /** File modes to enable (default: ['open', 'save']) */
+  fileModes?: FileMode[];
+  /** Default filename for saving GeoJSON (default: 'features.geojson') */
+  saveFilename?: string;
+  /** Callback when GeoJSON is loaded */
+  onGeoJsonLoad?: (result: GeoJsonLoadResult) => void;
+  /** Callback when GeoJSON is saved */
+  onGeoJsonSave?: (result: GeoJsonSaveResult) => void;
 }
 
 export type GeoEditorOptionsRequired = Required<GeoEditorOptions>;
@@ -229,6 +239,24 @@ export interface LassoResult {
   lasso: Feature<Polygon>;
 }
 
+export interface GeoJsonLoadResult {
+  /** Successfully loaded features */
+  features: Feature[];
+  /** Number of features loaded */
+  count: number;
+  /** Original filename */
+  filename: string;
+}
+
+export interface GeoJsonSaveResult {
+  /** The saved FeatureCollection */
+  featureCollection: FeatureCollection;
+  /** Number of features saved */
+  count: number;
+  /** Filename used for download */
+  filename: string;
+}
+
 // ============================================================================
 // Scale Handle Types
 // ============================================================================
@@ -266,6 +294,8 @@ export interface GeoEditorEventMap {
   'gm:lassoend': LassoResult;
   'gm:selectionchange': { features: Feature[] };
   'gm:modechange': { mode: DrawMode | EditMode | null };
+  'gm:geojsonload': GeoJsonLoadResult;
+  'gm:geojsonsave': GeoJsonSaveResult;
 }
 
 export type GeoEditorEventType = keyof GeoEditorEventMap;
