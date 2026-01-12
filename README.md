@@ -306,6 +306,41 @@ npm test
 npm run build
 ```
 
+## Docker
+
+The examples can be run using Docker. The image is automatically built and published to GitHub Container Registry.
+
+### Pull and Run
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/opengeos/maplibre-gl-geo-editor:latest
+
+# Run the container
+docker run -p 8080:80 ghcr.io/opengeos/maplibre-gl-geo-editor:latest
+```
+
+Then open http://localhost:8080/maplibre-gl-geo-editor/ in your browser to view the examples.
+
+### Build Locally
+
+```bash
+# Build the image
+docker build -t maplibre-gl-geo-editor .
+
+# Run the container
+docker run -p 8080:80 maplibre-gl-geo-editor
+```
+
+### Available Tags
+
+| Tag | Description |
+|-----|-------------|
+| `latest` | Latest release |
+| `x.y.z` | Specific version (e.g., `1.0.0`) |
+| `x.y` | Minor version (e.g., `1.0`) |
+
+
 ## Dependencies
 
 - [MapLibre GL JS](https://maplibre.org/) - Map rendering
