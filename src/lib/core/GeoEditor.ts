@@ -1,6 +1,6 @@
 import type { IControl, Map as MapLibreMap, MapMouseEvent, GeoJSONSource } from 'maplibre-gl';
 import maplibregl from 'maplibre-gl';
-import type { Feature, FeatureCollection, Polygon, LineString, Point } from 'geojson';
+import type { Feature, FeatureCollection, Polygon, LineString, Point, GeoJsonProperties } from 'geojson';
 import * as turf from '@turf/turf';
 import type {
   GeoEditorOptions,
@@ -19,6 +19,9 @@ import type {
   GeoJsonLoadResult,
   GeoJsonSaveResult,
   HistoryState,
+  AttributeFieldDefinition,
+  AttributeSchema,
+  AttributeChangeEvent,
 } from './types';
 import { HistoryManager } from './HistoryManager';
 import {
@@ -116,6 +119,14 @@ export class GeoEditor implements IControl {
   private pendingEditFeature: Feature | null = null;
   private isPerformingCompositeOperation: boolean = false;
 
+  // Attribute editing panel
+  private attributePanel: HTMLDivElement | null = null;
+  private attributePanelVisible: boolean = false;
+  private currentEditingFeature: Feature | null = null;
+  private currentEditingGeomanData: GeomanFeatureData | null = null;
+  private isNewFeature: boolean = false;
+  private originalProperties: Record<string, unknown> | null = null;
+
   constructor(options: GeoEditorOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
@@ -189,6 +200,11 @@ export class GeoEditor implements IControl {
     // Setup geoman event listener if geoman is available
     this.setupGeomanEvents();
 
+    // Create attribute editing panel if enabled
+    if (this.options.enableAttributeEditing) {
+      this.createAttributePanel();
+    }
+
     return this.container;
   }
 
@@ -202,8 +218,10 @@ export class GeoEditor implements IControl {
     this.removeMultiDragHandler();
     this.disableAllModes();
 
-    // Cleanup popup
+    // Cleanup popup and attribute panel
     this.hideFeaturePropertiesPopup();
+    this.hideAttributePanel();
+    this.removeAttributePanel();
 
     // Cleanup feature handlers
     this.scaleFeature.destroy();
@@ -1221,10 +1239,15 @@ export class GeoEditor implements IControl {
     this.options.onSelectionChange?.(features);
     this.logSelectedFeatureCollection('selected');
 
-    // Show popup for single selected feature in select mode
+    // Show popup or attribute panel for single selected feature in select mode
     if (features.length === 1 && this.isSelectMode) {
-      this.showFeaturePropertiesPopup(features[0]);
+      if (this.options.enableAttributeEditing) {
+        this.showAttributePanel(features[0], resolvedGeomanData?.[0] ?? undefined, false);
+      } else if (this.options.showFeatureProperties) {
+        this.showFeaturePropertiesPopup(features[0]);
+      }
     } else {
+      this.hideAttributePanel();
       this.hideFeaturePropertiesPopup();
     }
   }
@@ -1270,6 +1293,7 @@ export class GeoEditor implements IControl {
     this.state.selectedFeatures = [];
     this.updateSelectionHighlight();
     this.hideFeaturePropertiesPopup();
+    this.hideAttributePanel();
     this.options.onSelectionChange?.([]);
     this.logSelectedFeatureCollection('selected');
   }
@@ -1351,6 +1375,634 @@ export class GeoEditor implements IControl {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  // ============================================================================
+  // Attribute Editing Panel
+  // ============================================================================
+
+  /**
+   * Create the attribute editing panel DOM structure
+   */
+  private createAttributePanel(): void {
+    if (this.attributePanel) return;
+
+    const position = this.options.attributePanelPosition;
+    const width = this.options.attributePanelWidth;
+    const maxHeight = this.options.attributePanelMaxHeight;
+    const top = this.options.attributePanelTop;
+    const sideOffset = this.options.attributePanelSideOffset;
+
+    this.attributePanel = document.createElement('div');
+    this.attributePanel.className = `${CSS_PREFIX}-attribute-panel ${CSS_PREFIX}-attribute-panel--${position} ${CSS_PREFIX}-attribute-panel--hidden`;
+    this.attributePanel.style.width = `${width}px`;
+    this.attributePanel.style.maxHeight = typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight;
+    this.attributePanel.style.top = `${top}px`;
+    // Apply side offset based on position
+    if (position === 'right') {
+      this.attributePanel.style.right = `${sideOffset}px`;
+    } else {
+      this.attributePanel.style.left = `${sideOffset}px`;
+    }
+
+    // Header
+    const header = document.createElement('div');
+    header.className = `${CSS_PREFIX}-attribute-panel-header`;
+
+    const title = document.createElement('h3');
+    title.className = `${CSS_PREFIX}-attribute-panel-title`;
+    title.textContent = this.options.attributePanelTitle;
+    header.appendChild(title);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = `${CSS_PREFIX}-attribute-panel-close`;
+    closeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 1l12 12M13 1L1 13"/></svg>';
+    closeBtn.title = 'Close';
+    closeBtn.addEventListener('click', () => this.hideAttributePanel());
+    header.appendChild(closeBtn);
+
+    this.attributePanel.appendChild(header);
+
+    // Body
+    const body = document.createElement('div');
+    body.className = `${CSS_PREFIX}-attribute-panel-body`;
+    body.setAttribute('data-panel-body', 'true');
+    this.attributePanel.appendChild(body);
+
+    // Footer
+    const footer = document.createElement('div');
+    footer.className = `${CSS_PREFIX}-attribute-panel-footer`;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = `${CSS_PREFIX}-btn ${CSS_PREFIX}-btn--secondary`;
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', () => this.hideAttributePanel());
+    footer.appendChild(cancelBtn);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = `${CSS_PREFIX}-btn ${CSS_PREFIX}-btn--primary`;
+    saveBtn.textContent = 'Save';
+    saveBtn.setAttribute('data-save-btn', 'true');
+    saveBtn.addEventListener('click', () => this.saveAttributeChanges());
+    footer.appendChild(saveBtn);
+
+    this.attributePanel.appendChild(footer);
+
+    // Append to map container
+    this.map.getContainer().appendChild(this.attributePanel);
+  }
+
+  /**
+   * Remove the attribute panel from DOM
+   */
+  private removeAttributePanel(): void {
+    if (this.attributePanel && this.attributePanel.parentNode) {
+      this.attributePanel.parentNode.removeChild(this.attributePanel);
+      this.attributePanel = null;
+    }
+  }
+
+  /**
+   * Show the attribute panel with feature data
+   */
+  private showAttributePanel(
+    feature: Feature,
+    geomanData?: GeomanFeatureData,
+    isNew: boolean = false
+  ): void {
+    if (!this.attributePanel) return;
+
+    this.currentEditingFeature = feature;
+    this.currentEditingGeomanData = geomanData ?? null;
+    this.isNewFeature = isNew;
+    this.originalProperties = feature.properties ? { ...feature.properties } : {};
+
+    // Build the form
+    this.buildAttributeForm(feature);
+
+    // Show the panel
+    this.attributePanel.classList.remove(`${CSS_PREFIX}-attribute-panel--hidden`);
+    this.attributePanelVisible = true;
+
+    // Hide the properties popup if visible
+    this.hideFeaturePropertiesPopup();
+  }
+
+  /**
+   * Hide the attribute panel
+   */
+  private hideAttributePanel(): void {
+    if (!this.attributePanel) return;
+
+    this.attributePanel.classList.add(`${CSS_PREFIX}-attribute-panel--hidden`);
+    this.attributePanelVisible = false;
+    this.currentEditingFeature = null;
+    this.currentEditingGeomanData = null;
+    this.isNewFeature = false;
+    this.originalProperties = null;
+  }
+
+  /**
+   * Toggle attribute panel visibility
+   */
+  toggleAttributePanel(): void {
+    if (this.attributePanelVisible) {
+      this.hideAttributePanel();
+    } else if (this.currentEditingFeature) {
+      this.showAttributePanel(
+        this.currentEditingFeature,
+        this.currentEditingGeomanData ?? undefined,
+        this.isNewFeature
+      );
+    }
+  }
+
+  /**
+   * Get schema fields for a geometry type
+   */
+  private getSchemaFieldsForGeometry(geometryType: string): AttributeFieldDefinition[] {
+    const schema = this.options.attributeSchema;
+    if (!schema) return [];
+
+    const fields: AttributeFieldDefinition[] = [];
+
+    // Add geometry-specific fields
+    if (geometryType === 'Polygon' || geometryType === 'MultiPolygon') {
+      if (schema.polygon) fields.push(...schema.polygon);
+    } else if (geometryType === 'LineString' || geometryType === 'MultiLineString') {
+      if (schema.line) fields.push(...schema.line);
+    } else if (geometryType === 'Point' || geometryType === 'MultiPoint') {
+      if (schema.point) fields.push(...schema.point);
+    }
+
+    // Add common fields
+    if (schema.common) fields.push(...schema.common);
+
+    return fields;
+  }
+
+  /**
+   * Get properties not defined in schema (extra properties)
+   */
+  private getExtraProperties(feature: Feature): Record<string, unknown> {
+    const properties = feature.properties || {};
+    const schemaFields = this.getSchemaFieldsForGeometry(feature.geometry.type);
+    const schemaFieldNames = new Set(schemaFields.map(f => f.name));
+
+    const extra: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(properties)) {
+      // Skip internal properties and schema fields
+      if (!key.startsWith('__') && !schemaFieldNames.has(key)) {
+        extra[key] = value;
+      }
+    }
+    return extra;
+  }
+
+  /**
+   * Build the attribute form for a feature
+   */
+  private buildAttributeForm(feature: Feature): void {
+    if (!this.attributePanel) return;
+
+    const body = this.attributePanel.querySelector('[data-panel-body]');
+    if (!body) return;
+
+    body.innerHTML = '';
+
+    const geometryType = feature.geometry.type;
+    const schemaFields = this.getSchemaFieldsForGeometry(geometryType);
+    const properties = feature.properties || {};
+
+    // Add geometry type badge to header
+    const header = this.attributePanel.querySelector(`.${CSS_PREFIX}-attribute-panel-header`);
+    if (header) {
+      // Remove existing badge
+      const existingBadge = header.querySelector(`.${CSS_PREFIX}-attribute-geometry-badge`);
+      if (existingBadge) existingBadge.remove();
+
+      const badge = document.createElement('span');
+      badge.className = `${CSS_PREFIX}-attribute-geometry-badge`;
+      badge.textContent = this.getGeometryDisplayName(geometryType);
+      const title = header.querySelector(`.${CSS_PREFIX}-attribute-panel-title`);
+      if (title) title.appendChild(badge);
+    }
+
+    // Build schema fields
+    if (schemaFields.length > 0) {
+      schemaFields.forEach(field => {
+        const value = properties[field.name];
+        const formGroup = this.createFormField(field, value);
+        body.appendChild(formGroup);
+      });
+    } else {
+      // No schema defined - show empty message or all properties as editable
+      const emptyMessage = document.createElement('div');
+      emptyMessage.className = `${CSS_PREFIX}-attribute-empty`;
+      emptyMessage.textContent = 'No attribute schema defined';
+      body.appendChild(emptyMessage);
+    }
+
+    // Show extra properties (not in schema) as read-only
+    const extraProps = this.getExtraProperties(feature);
+    const extraKeys = Object.keys(extraProps);
+    if (extraKeys.length > 0) {
+      const extraSection = document.createElement('div');
+      extraSection.className = `${CSS_PREFIX}-attribute-extra-section`;
+
+      const sectionTitle = document.createElement('div');
+      sectionTitle.className = `${CSS_PREFIX}-attribute-extra-section-title`;
+      sectionTitle.textContent = 'Other Properties';
+      extraSection.appendChild(sectionTitle);
+
+      extraKeys.forEach(key => {
+        const formGroup = this.createReadOnlyField(key, extraProps[key]);
+        extraSection.appendChild(formGroup);
+      });
+
+      body.appendChild(extraSection);
+    }
+  }
+
+  /**
+   * Get display name for geometry type
+   */
+  private getGeometryDisplayName(geometryType: string): string {
+    const names: Record<string, string> = {
+      Point: 'Point',
+      MultiPoint: 'Multi-Point',
+      LineString: 'Line',
+      MultiLineString: 'Multi-Line',
+      Polygon: 'Polygon',
+      MultiPolygon: 'Multi-Polygon',
+      GeometryCollection: 'Collection',
+    };
+    return names[geometryType] || geometryType;
+  }
+
+  /**
+   * Create a form field element
+   */
+  private createFormField(field: AttributeFieldDefinition, value: unknown): HTMLDivElement {
+    const formGroup = document.createElement('div');
+    formGroup.className = `${CSS_PREFIX}-attribute-form-group`;
+
+    // Create label
+    const label = document.createElement('label');
+    label.className = `${CSS_PREFIX}-attribute-label`;
+    if (field.required) {
+      label.classList.add(`${CSS_PREFIX}-attribute-label--required`);
+    }
+    label.textContent = field.label || field.name;
+    label.setAttribute('for', `attr-${field.name}`);
+    formGroup.appendChild(label);
+
+    // Create input based on type
+    const input = this.createInputForFieldType(field, value);
+    formGroup.appendChild(input);
+
+    return formGroup;
+  }
+
+  /**
+   * Create input element for a specific field type
+   */
+  private createInputForFieldType(field: AttributeFieldDefinition, value: unknown): HTMLElement {
+    const id = `attr-${field.name}`;
+
+    switch (field.type) {
+      case 'boolean': {
+        const wrapper = document.createElement('div');
+        wrapper.className = `${CSS_PREFIX}-attribute-checkbox-wrapper`;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = id;
+        checkbox.name = field.name;
+        checkbox.className = `${CSS_PREFIX}-attribute-checkbox`;
+        checkbox.checked = value === true || value === 'true';
+        checkbox.disabled = field.readOnly ?? false;
+        wrapper.appendChild(checkbox);
+
+        const checkboxLabel = document.createElement('label');
+        checkboxLabel.className = `${CSS_PREFIX}-attribute-checkbox-label`;
+        checkboxLabel.setAttribute('for', id);
+        checkboxLabel.textContent = field.label || field.name;
+        wrapper.appendChild(checkboxLabel);
+
+        return wrapper;
+      }
+
+      case 'select': {
+        const select = document.createElement('select');
+        select.id = id;
+        select.name = field.name;
+        select.className = `${CSS_PREFIX}-attribute-select`;
+        select.disabled = field.readOnly ?? false;
+
+        // Add empty option if not required
+        if (!field.required) {
+          const emptyOption = document.createElement('option');
+          emptyOption.value = '';
+          emptyOption.textContent = '-- Select --';
+          select.appendChild(emptyOption);
+        }
+
+        // Add options
+        if (field.options) {
+          field.options.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = String(opt.value);
+            option.textContent = opt.label;
+            if (String(value) === String(opt.value)) {
+              option.selected = true;
+            }
+            select.appendChild(option);
+          });
+        }
+
+        return select;
+      }
+
+      case 'textarea': {
+        const textarea = document.createElement('textarea');
+        textarea.id = id;
+        textarea.name = field.name;
+        textarea.className = `${CSS_PREFIX}-attribute-textarea`;
+        textarea.value = value != null ? String(value) : '';
+        textarea.placeholder = field.placeholder || '';
+        textarea.disabled = field.readOnly ?? false;
+        return textarea;
+      }
+
+      case 'number': {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.id = id;
+        input.name = field.name;
+        input.className = `${CSS_PREFIX}-attribute-input`;
+        input.value = value != null ? String(value) : '';
+        input.placeholder = field.placeholder || '';
+        input.disabled = field.readOnly ?? false;
+        if (field.min !== undefined) input.min = String(field.min);
+        if (field.max !== undefined) input.max = String(field.max);
+        if (field.step !== undefined) input.step = String(field.step);
+        return input;
+      }
+
+      case 'date': {
+        const input = document.createElement('input');
+        input.type = 'date';
+        input.id = id;
+        input.name = field.name;
+        input.className = `${CSS_PREFIX}-attribute-input`;
+        input.value = value != null ? String(value) : '';
+        input.disabled = field.readOnly ?? false;
+        return input;
+      }
+
+      case 'color': {
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.id = id;
+        input.name = field.name;
+        input.className = `${CSS_PREFIX}-attribute-input`;
+        input.value = value != null ? String(value) : '#000000';
+        input.disabled = field.readOnly ?? false;
+        return input;
+      }
+
+      case 'string':
+      default: {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = id;
+        input.name = field.name;
+        input.className = `${CSS_PREFIX}-attribute-input`;
+        input.value = value != null ? String(value) : '';
+        input.placeholder = field.placeholder || '';
+        input.disabled = field.readOnly ?? false;
+        return input;
+      }
+    }
+  }
+
+  /**
+   * Create a read-only field for extra properties
+   */
+  private createReadOnlyField(name: string, value: unknown): HTMLDivElement {
+    const formGroup = document.createElement('div');
+    formGroup.className = `${CSS_PREFIX}-attribute-form-group`;
+
+    const label = document.createElement('label');
+    label.className = `${CSS_PREFIX}-attribute-label`;
+    label.textContent = name;
+    formGroup.appendChild(label);
+
+    const display = document.createElement('div');
+    display.className = `${CSS_PREFIX}-attribute-readonly`;
+
+    if (value === null || value === undefined) {
+      display.classList.add(`${CSS_PREFIX}-attribute-readonly-null`);
+      display.textContent = 'null';
+    } else if (typeof value === 'object') {
+      display.textContent = JSON.stringify(value);
+    } else {
+      display.textContent = String(value);
+    }
+
+    formGroup.appendChild(display);
+    return formGroup;
+  }
+
+  /**
+   * Collect form values from the attribute panel
+   */
+  private collectFormValues(): Record<string, unknown> {
+    if (!this.attributePanel || !this.currentEditingFeature) return {};
+
+    const body = this.attributePanel.querySelector('[data-panel-body]');
+    if (!body) return {};
+
+    const values: Record<string, unknown> = {};
+    const schemaFields = this.getSchemaFieldsForGeometry(this.currentEditingFeature.geometry.type);
+
+    schemaFields.forEach(field => {
+      const element = body.querySelector(`[name="${field.name}"]`) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+      if (!element) return;
+
+      if (field.type === 'boolean') {
+        values[field.name] = (element as HTMLInputElement).checked;
+      } else if (field.type === 'number') {
+        const numValue = element.value.trim();
+        values[field.name] = numValue !== '' ? parseFloat(numValue) : null;
+      } else {
+        values[field.name] = element.value || null;
+      }
+    });
+
+    return values;
+  }
+
+  /**
+   * Validate form values
+   */
+  private validateFormValues(values: Record<string, unknown>): { valid: boolean; errors: Record<string, string> } {
+    if (!this.currentEditingFeature) return { valid: true, errors: {} };
+
+    const schemaFields = this.getSchemaFieldsForGeometry(this.currentEditingFeature.geometry.type);
+    const errors: Record<string, string> = {};
+
+    schemaFields.forEach(field => {
+      if (field.required) {
+        const value = values[field.name];
+        if (value === null || value === undefined || value === '') {
+          errors[field.name] = `${field.label || field.name} is required`;
+        }
+      }
+    });
+
+    return { valid: Object.keys(errors).length === 0, errors };
+  }
+
+  /**
+   * Show validation errors on form fields
+   */
+  private showValidationErrors(errors: Record<string, string>): void {
+    if (!this.attributePanel) return;
+
+    const body = this.attributePanel.querySelector('[data-panel-body]');
+    if (!body) return;
+
+    // Clear existing errors
+    body.querySelectorAll(`.${CSS_PREFIX}-attribute-error`).forEach(el => el.remove());
+    body.querySelectorAll(`.${CSS_PREFIX}-attribute-input--error, .${CSS_PREFIX}-attribute-select--error, .${CSS_PREFIX}-attribute-textarea--error`)
+      .forEach(el => {
+        el.classList.remove(`${CSS_PREFIX}-attribute-input--error`);
+        el.classList.remove(`${CSS_PREFIX}-attribute-select--error`);
+        el.classList.remove(`${CSS_PREFIX}-attribute-textarea--error`);
+      });
+
+    // Show new errors
+    Object.entries(errors).forEach(([fieldName, message]) => {
+      const element = body.querySelector(`[name="${fieldName}"]`);
+      if (element) {
+        element.classList.add(`${CSS_PREFIX}-attribute-input--error`);
+        const errorDiv = document.createElement('div');
+        errorDiv.className = `${CSS_PREFIX}-attribute-error`;
+        errorDiv.textContent = message;
+        element.parentNode?.appendChild(errorDiv);
+      }
+    });
+  }
+
+  /**
+   * Apply default values from schema to a feature
+   */
+  private applyDefaultValues(feature: Feature): void {
+    const schemaFields = this.getSchemaFieldsForGeometry(feature.geometry.type);
+    if (schemaFields.length === 0) return;
+
+    if (!feature.properties) {
+      feature.properties = {};
+    }
+
+    schemaFields.forEach(field => {
+      if (field.defaultValue !== undefined && feature.properties![field.name] === undefined) {
+        feature.properties![field.name] = field.defaultValue;
+      }
+    });
+  }
+
+  /**
+   * Save attribute changes to the feature
+   */
+  private saveAttributeChanges(): void {
+    if (!this.currentEditingFeature) return;
+
+    const values = this.collectFormValues();
+    const validation = this.validateFormValues(values);
+
+    if (!validation.valid) {
+      this.showValidationErrors(validation.errors);
+      return;
+    }
+
+    // Merge with existing properties (preserve extra properties)
+    const newProperties: GeoJsonProperties = {
+      ...this.currentEditingFeature.properties,
+      ...values,
+    };
+
+    // Update feature properties
+    this.currentEditingFeature.properties = newProperties;
+
+    // Update Geoman feature if available
+    if (this.currentEditingGeomanData) {
+      this.updateFeatureProperties(this.currentEditingGeomanData, newProperties);
+    }
+
+    // Fire callback
+    const event: AttributeChangeEvent = {
+      feature: this.currentEditingFeature,
+      previousProperties: (this.originalProperties ?? {}) as GeoJsonProperties,
+      newProperties,
+      isNewFeature: this.isNewFeature,
+    };
+    this.options.onAttributeChange?.(event);
+
+    // Hide the panel
+    this.hideAttributePanel();
+  }
+
+  /**
+   * Update Geoman feature properties
+   */
+  private updateFeatureProperties(geomanData: GeomanFeatureData, properties: GeoJsonProperties): void {
+    // Get the current GeoJSON from Geoman
+    const geoJson = geomanData.getGeoJson ? geomanData.getGeoJson() : geomanData.geoJson;
+    if (geoJson) {
+      geoJson.properties = properties;
+    }
+  }
+
+  /**
+   * Programmatically open attribute editor for a feature
+   */
+  openAttributeEditor(feature: Feature): void {
+    if (!this.options.enableAttributeEditing) {
+      console.warn('Attribute editing is not enabled');
+      return;
+    }
+
+    const geomanData = this.findGeomanDataForFeature(feature);
+    this.showAttributePanel(feature, geomanData ?? undefined, false);
+  }
+
+  /**
+   * Close attribute editor
+   */
+  closeAttributeEditor(): void {
+    this.hideAttributePanel();
+  }
+
+  /**
+   * Dynamically set attribute schema
+   */
+  setAttributeSchema(schema: AttributeSchema): void {
+    this.options.attributeSchema = schema;
+
+    // Rebuild form if panel is visible
+    if (this.attributePanelVisible && this.currentEditingFeature) {
+      this.buildAttributeForm(this.currentEditingFeature);
+    }
+  }
+
+  /**
+   * Get the current attribute schema
+   */
+  getAttributeSchema(): AttributeSchema | undefined {
+    return this.options.attributeSchema;
   }
 
   // ============================================================================
@@ -2612,6 +3264,13 @@ export class GeoEditor implements IControl {
         this.logSelectedFeatureCollection('created', eventFeature);
         // Record create operation in history
         this.recordCreateOperation(eventFeature);
+
+        // Show attribute panel for newly created feature
+        if (this.options.enableAttributeEditing) {
+          this.applyDefaultValues(eventFeature);
+          const geomanData = this.findGeomanDataForFeature(eventFeature);
+          this.showAttributePanel(eventFeature, geomanData ?? undefined, true);
+        }
       }
 
       // Handle feature edit start - store pre-edit state

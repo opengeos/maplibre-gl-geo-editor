@@ -104,12 +104,19 @@
         <li>Open GeoJSON file</li>
         <li>Save as GeoJSON</li>
       </ul>
+      <h3 style="margin-top: 12px">Attribute Editing</h3>
+      <ul>
+        <li>Auto-shows on draw/select</li>
+        <li>Schema-based form fields</li>
+        <li>Validation support</li>
+      </ul>
       <h3 style="margin-top: 12px">Keyboard Shortcuts</h3>
       <ul>
         <li><code>Ctrl+C</code> Copy selected</li>
         <li><code>Ctrl+V</code> Paste</li>
+        <li><code>Ctrl+Z</code> Undo</li>
+        <li><code>Ctrl+Y</code> Redo</li>
         <li><code>Delete</code> Delete selected</li>
-        <li><code>Enter</code> Execute operation</li>
         <li><code>Escape</code> Cancel / Clear</li>
       </ul>
     </div>
@@ -164,6 +171,44 @@
             collapsed: false,
             toolbarOrientation: 'vertical',
             showLabels: false,
+            // Enable attribute editing panel
+            enableAttributeEditing: true,
+            attributePanelPosition: 'right',
+            attributePanelWidth: 300,
+            attributePanelTitle: 'Feature Properties',
+            // Define attribute schema for different geometry types
+            attributeSchema: {
+              polygon: [
+                { name: 'name', label: 'Name', type: 'string', required: true },
+                {
+                  name: 'land_use',
+                  label: 'Land Use',
+                  type: 'select',
+                  options: [
+                    { value: 'residential', label: 'Residential' },
+                    { value: 'commercial', label: 'Commercial' },
+                    { value: 'industrial', label: 'Industrial' },
+                    { value: 'park', label: 'Park' },
+                  ],
+                  defaultValue: 'residential',
+                },
+                { name: 'description', label: 'Description', type: 'textarea' },
+              ],
+              line: [
+                { name: 'name', label: 'Name', type: 'string', required: true },
+                { name: 'road_type', label: 'Road Type', type: 'string' },
+                { name: 'lanes', label: 'Lanes', type: 'number', min: 1, max: 8 },
+              ],
+              point: [
+                { name: 'name', label: 'Name', type: 'string', required: true },
+                { name: 'category', label: 'Category', type: 'string' },
+                { name: 'active', label: 'Active', type: 'boolean', defaultValue: true },
+              ],
+              common: [
+                { name: 'notes', label: 'Notes', type: 'textarea' },
+                { name: 'color', label: 'Color', type: 'color', defaultValue: '#3388ff' },
+              ],
+            },
             // All draw modes
             drawModes: [
               'polygon',
@@ -215,6 +260,9 @@
             onGeoJsonSave: (result) => {
               console.log('GeoJSON saved:', result);
             },
+            onAttributeChange: (event) => {
+              console.log('Attribute changed:', event);
+            },
           });
 
           console.log('GeoEditor instance created:', geoEditor);
@@ -227,11 +275,17 @@
           map.addControl(geoEditor, 'top-left');
           console.log('GeoEditor control added to map');
 
-          // Add sample features
+          // Add sample features with properties
           geoman.features.importGeoJsonFeature({
             type: 'Feature',
             id: 'sample-polygon',
-            properties: { name: 'Sample Polygon' },
+            properties: {
+              name: 'Downtown District',
+              land_use: 'commercial',
+              description: 'Main commercial area',
+              notes: 'High traffic zone',
+              color: '#ff6b6b',
+            },
             geometry: {
               type: 'Polygon',
               coordinates: [
@@ -249,7 +303,12 @@
           geoman.features.importGeoJsonFeature({
             type: 'Feature',
             id: 'sample-polygon-2',
-            properties: { name: 'Sample Polygon 2' },
+            properties: {
+              name: 'Residential Area',
+              land_use: 'residential',
+              description: 'Quiet neighborhood',
+              color: '#4ecdc4',
+            },
             geometry: {
               type: 'Polygon',
               coordinates: [
