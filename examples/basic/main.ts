@@ -49,7 +49,71 @@ map.on('load', () => {
       toolbarOrientation: 'vertical',
       columns: 2,
       showLabels: false,
-      showFeatureProperties: true,
+      // Enable attribute editing panel instead of popup
+      enableAttributeEditing: true,
+      attributePanelPosition: 'right',
+      attributePanelWidth: 320,
+      attributePanelMaxHeight: '70vh', // Limit panel height (can also use pixels like 500)
+      attributePanelTop: 10, // Offset from top (useful to avoid other controls)
+      attributePanelSideOffset: 10, // Offset from right/left edge
+      attributePanelTitle: 'Feature Properties',
+      // Define attribute schema for different geometry types
+      attributeSchema: {
+        polygon: [
+          { name: 'name', label: 'Name', type: 'string', required: true, placeholder: 'Enter name...' },
+          {
+            name: 'land_use',
+            label: 'Land Use',
+            type: 'select',
+            options: [
+              { value: 'residential', label: 'Residential' },
+              { value: 'commercial', label: 'Commercial' },
+              { value: 'industrial', label: 'Industrial' },
+              { value: 'park', label: 'Park/Recreation' },
+            ],
+            defaultValue: 'residential',
+          },
+          { name: 'area_sqm', label: 'Area (sq m)', type: 'number', min: 0 },
+          { name: 'description', label: 'Description', type: 'textarea', placeholder: 'Enter description...' },
+        ],
+        line: [
+          { name: 'name', label: 'Name', type: 'string', required: true },
+          {
+            name: 'road_type',
+            label: 'Road Type',
+            type: 'select',
+            options: [
+              { value: 'highway', label: 'Highway' },
+              { value: 'main', label: 'Main Road' },
+              { value: 'residential', label: 'Residential Street' },
+              { value: 'path', label: 'Path/Trail' },
+            ],
+          },
+          { name: 'lanes', label: 'Lanes', type: 'number', min: 1, max: 8, step: 1 },
+          { name: 'speed_limit', label: 'Speed Limit (km/h)', type: 'number', min: 5, max: 130, step: 5 },
+        ],
+        point: [
+          { name: 'name', label: 'Name', type: 'string', required: true },
+          {
+            name: 'category',
+            label: 'Category',
+            type: 'select',
+            options: [
+              { value: 'poi', label: 'Point of Interest' },
+              { value: 'landmark', label: 'Landmark' },
+              { value: 'facility', label: 'Facility' },
+              { value: 'other', label: 'Other' },
+            ],
+            defaultValue: 'poi',
+          },
+          { name: 'active', label: 'Active', type: 'boolean', defaultValue: true },
+        ],
+        common: [
+          { name: 'notes', label: 'Notes', type: 'textarea' },
+          { name: 'color', label: 'Color', type: 'color', defaultValue: '#3388ff' },
+          { name: 'created_date', label: 'Created Date', type: 'date' },
+        ],
+      },
       drawModes: [
         'polygon',
         'line',
@@ -97,6 +161,13 @@ map.on('load', () => {
       },
       onGeoJsonSave: (result) => {
         console.log(`Saved ${result.count} features to ${result.filename}`);
+      },
+      onAttributeChange: (event) => {
+        console.log('Attribute changed:', {
+          isNew: event.isNewFeature,
+          previous: event.previousProperties,
+          new: event.newProperties,
+        });
       },
     });
 
@@ -149,7 +220,14 @@ map.on('load', () => {
     const samplePolygon = {
       type: 'Feature' as const,
       id: 'sample-polygon',
-      properties: { name: 'Sample Polygon' },
+      properties: {
+        name: 'Downtown District',
+        land_use: 'commercial',
+        area_sqm: 45000,
+        description: 'Main commercial district with shops and offices',
+        notes: 'High foot traffic area',
+        color: '#ff6b6b',
+      },
       geometry: {
         type: 'Polygon' as const,
         coordinates: [
@@ -167,7 +245,13 @@ map.on('load', () => {
     const samplePolygon2 = {
       type: 'Feature' as const,
       id: 'sample-polygon-2',
-      properties: { name: 'Sample Polygon 2' },
+      properties: {
+        name: 'Residential Area',
+        land_use: 'residential',
+        area_sqm: 32000,
+        description: 'Quiet residential neighborhood',
+        color: '#4ecdc4',
+      },
       geometry: {
         type: 'Polygon' as const,
         coordinates: [

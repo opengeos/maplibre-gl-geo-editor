@@ -35,6 +35,11 @@ export type {
   HistoryOperationType,
   Command,
   HistoryState,
+  // Attribute editing types
+  AttributeFieldType,
+  AttributeFieldDefinition,
+  AttributeSchema,
+  AttributeChangeEvent,
 } from './lib/core/types';
 
 // Feature exports

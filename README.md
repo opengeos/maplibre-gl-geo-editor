@@ -36,9 +36,22 @@ A powerful MapLibre GL plugin for creating and editing geometries. Extends the f
 - **Lasso** - Select multiple features by drawing a polygon (supports union/difference/drag)
 - **Reset** - Clear selection and disable active tools (toolbar button)
 
+### Attribute Editing
+- **Side Panel** - Edit feature properties in a slide-out panel
+- **Schema Support** - Define field types per geometry (polygon, line, point)
+- **Field Types** - String, number, boolean, select, date, color, textarea
+- **Default Values** - Auto-apply defaults to newly created features
+- **Validation** - Required field validation with error display
+- **Extra Properties** - Non-schema properties shown as read-only
+
 ### File Operations
 - **Open** - Load GeoJSON file from disk (auto-zooms to extent when enabled)
 - **Save** - Download current features as GeoJSON file
+
+### History (Undo/Redo)
+- **Undo** - Revert the last create, edit, or delete operation (Ctrl+Z)
+- **Redo** - Reapply the last undone operation (Ctrl+Y)
+- Configurable history size (default: 50 operations)
 
 ## Installation
 
@@ -95,6 +108,96 @@ map.on('load', () => {
     map.addControl(geoEditor, 'top-left');
   });
 });
+```
+
+### Attribute Editing
+
+Enable the attribute editing panel to edit feature properties with a schema-based form:
+
+```typescript
+const geoEditor = new GeoEditor({
+  position: 'top-left',
+  enableAttributeEditing: true,
+  attributePanelPosition: 'right',  // 'left' or 'right'
+  attributePanelWidth: 300,
+  attributePanelTitle: 'Feature Properties',
+  attributeSchema: {
+    // Fields for polygon features
+    polygon: [
+      { name: 'name', label: 'Name', type: 'string', required: true },
+      {
+        name: 'land_use',
+        label: 'Land Use',
+        type: 'select',
+        options: [
+          { value: 'residential', label: 'Residential' },
+          { value: 'commercial', label: 'Commercial' },
+          { value: 'industrial', label: 'Industrial' },
+        ],
+        defaultValue: 'residential'
+      },
+      { name: 'description', label: 'Description', type: 'textarea' }
+    ],
+    // Fields for line features
+    line: [
+      { name: 'name', label: 'Name', type: 'string', required: true },
+      { name: 'road_type', label: 'Road Type', type: 'string' },
+      { name: 'lanes', label: 'Lanes', type: 'number', min: 1, max: 8 }
+    ],
+    // Fields for point features
+    point: [
+      { name: 'name', label: 'Name', type: 'string', required: true },
+      { name: 'category', label: 'Category', type: 'string' },
+      { name: 'active', label: 'Active', type: 'boolean', defaultValue: true }
+    ],
+    // Common fields for all geometry types
+    common: [
+      { name: 'notes', label: 'Notes', type: 'textarea' },
+      { name: 'color', label: 'Color', type: 'color', defaultValue: '#3388ff' }
+    ]
+  },
+  onAttributeChange: (event) => {
+    console.log('Feature:', event.feature);
+    console.log('Previous:', event.previousProperties);
+    console.log('New:', event.newProperties);
+    console.log('Is new feature:', event.isNewFeature);
+  }
+});
+```
+
+The panel auto-appears when:
+- A new geometry is drawn (after drawing completes)
+- A single feature is selected in select mode
+
+#### Field Types
+
+| Type | Description | Additional Options |
+|------|-------------|-------------------|
+| `string` | Single-line text input | `placeholder` |
+| `number` | Numeric input | `min`, `max`, `step` |
+| `boolean` | Checkbox | - |
+| `select` | Dropdown select | `options: [{value, label}]` |
+| `date` | Date picker | - |
+| `color` | Color picker | - |
+| `textarea` | Multi-line text | `placeholder` |
+
+#### Programmatic Control
+
+```typescript
+// Open editor for a specific feature
+geoEditor.openAttributeEditor(feature);
+
+// Close the editor
+geoEditor.closeAttributeEditor();
+
+// Toggle visibility
+geoEditor.toggleAttributePanel();
+
+// Update schema dynamically
+geoEditor.setAttributeSchema(newSchema);
+
+// Get current schema
+const schema = geoEditor.getAttributeSchema();
 ```
 
 ### React Usage
@@ -177,6 +280,18 @@ function App() {
 | `onModeChange` | `(mode) => void` | - | Callback when mode changes |
 | `onGeoJsonLoad` | `(result) => void` | - | Callback when GeoJSON is loaded |
 | `onGeoJsonSave` | `(result) => void` | - | Callback when GeoJSON is saved |
+| `enableAttributeEditing` | `boolean` | `false` | Enable attribute editing panel |
+| `attributeSchema` | `AttributeSchema` | - | Schema defining fields per geometry type |
+| `attributePanelPosition` | `'left' \| 'right'` | `'right'` | Position of the attribute panel |
+| `attributePanelWidth` | `number` | `300` | Width of the attribute panel in pixels |
+| `attributePanelMaxHeight` | `number \| string` | `'80vh'` | Maximum height of the attribute panel (px or CSS value) |
+| `attributePanelTop` | `number` | `10` | Offset from top of map container in pixels |
+| `attributePanelSideOffset` | `number` | `10` | Offset from left/right side of map container in pixels |
+| `attributePanelTitle` | `string` | `'Feature Properties'` | Title of the attribute panel |
+| `onAttributeChange` | `(event) => void` | - | Callback when feature attributes change |
+| `enableHistory` | `boolean` | `true` | Enable undo/redo functionality |
+| `maxHistorySize` | `number` | `50` | Maximum number of history entries |
+| `onHistoryChange` | `(canUndo, canRedo) => void` | - | Callback when history state changes |
 
 ### Methods
 
@@ -217,6 +332,21 @@ geoEditor.getLastDeletedFeatureId();
 
 // Get state
 geoEditor.getState();
+
+// Attribute editing
+geoEditor.openAttributeEditor(feature);   // Open editor for a feature
+geoEditor.closeAttributeEditor();         // Close the editor
+geoEditor.toggleAttributePanel();         // Toggle visibility
+geoEditor.setAttributeSchema(schema);     // Update schema dynamically
+geoEditor.getAttributeSchema();           // Get current schema
+
+// History (undo/redo)
+geoEditor.undo();                         // Undo last operation
+geoEditor.redo();                         // Redo last undone operation
+geoEditor.canUndo();                      // Check if undo is available
+geoEditor.canRedo();                      // Check if redo is available
+geoEditor.clearHistory();                 // Clear all history
+geoEditor.getHistoryState();              // Get history state object
 ```
 
 ### Events
@@ -257,6 +387,8 @@ map.getContainer().addEventListener('gm:geojsonsave', (e) => {
 |----------|--------|
 | `Ctrl+C` | Copy selected features |
 | `Ctrl+V` | Paste features |
+| `Ctrl+Z` | Undo last operation |
+| `Ctrl+Y` | Redo last undone operation |
 | `Delete` | Delete selected features |
 | `Escape` | Cancel operation / Clear selection |
 

@@ -4,6 +4,7 @@ import type {
   EditMode,
   HelperMode,
   FileMode,
+  AttributeSchema,
 } from './types';
 
 /**
@@ -91,6 +92,15 @@ export const DEFAULT_OPTIONS: GeoEditorOptionsRequired = {
   enableHistory: true,
   maxHistorySize: 50,
   onHistoryChange: () => {},
+  enableAttributeEditing: false,
+  attributeSchema: undefined as AttributeSchema | undefined,
+  onAttributeChange: () => {},
+  attributePanelPosition: 'right' as const,
+  attributePanelWidth: 300,
+  attributePanelMaxHeight: '80vh',
+  attributePanelTop: 10,
+  attributePanelSideOffset: 10,
+  attributePanelTitle: 'Feature Properties',
 };
 
 /**

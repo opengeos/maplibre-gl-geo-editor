@@ -112,9 +112,30 @@ export interface GeoEditorOptions {
   maxHistorySize?: number;
   /** Callback when history state changes */
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+  /** Enable attribute editing panel (default: false) */
+  enableAttributeEditing?: boolean;
+  /** Schema defining attribute fields per geometry type */
+  attributeSchema?: AttributeSchema;
+  /** Callback when feature attributes change */
+  onAttributeChange?: (event: AttributeChangeEvent) => void;
+  /** Position of the attribute panel (default: 'right') */
+  attributePanelPosition?: 'left' | 'right';
+  /** Width of the attribute panel in pixels (default: 300) */
+  attributePanelWidth?: number;
+  /** Maximum height of the attribute panel in pixels or CSS value (default: '80vh') */
+  attributePanelMaxHeight?: number | string;
+  /** Offset from top of map container in pixels (default: 10) */
+  attributePanelTop?: number;
+  /** Offset from left/right side of map container in pixels (default: 10) */
+  attributePanelSideOffset?: number;
+  /** Title of the attribute panel (default: 'Feature Properties') */
+  attributePanelTitle?: string;
 }
 
-export type GeoEditorOptionsRequired = Required<GeoEditorOptions>;
+// Make all options required except attributeSchema which can remain undefined
+export type GeoEditorOptionsRequired = Required<Omit<GeoEditorOptions, 'attributeSchema'>> & {
+  attributeSchema: AttributeSchema | undefined;
+};
 
 // ============================================================================
 // State Types
@@ -428,4 +449,76 @@ export interface HistoryState {
   canRedo: boolean;
   undoCount: number;
   redoCount: number;
+}
+
+// ============================================================================
+// Attribute Editing Types
+// ============================================================================
+
+/**
+ * Available field types for attribute editing
+ */
+export type AttributeFieldType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'select'
+  | 'date'
+  | 'color'
+  | 'textarea';
+
+/**
+ * Definition for a single attribute field
+ */
+export interface AttributeFieldDefinition {
+  /** Property name in the GeoJSON feature */
+  name: string;
+  /** Display label for the field */
+  label?: string;
+  /** Field type determining the input control */
+  type: AttributeFieldType;
+  /** Default value for new features */
+  defaultValue?: string | number | boolean;
+  /** Whether the field is required */
+  required?: boolean;
+  /** Placeholder text for the input */
+  placeholder?: string;
+  /** Options for select fields */
+  options?: Array<{ value: string | number; label: string }>;
+  /** Minimum value for number fields */
+  min?: number;
+  /** Maximum value for number fields */
+  max?: number;
+  /** Step value for number fields */
+  step?: number;
+  /** Whether the field is read-only */
+  readOnly?: boolean;
+}
+
+/**
+ * Schema defining attribute fields per geometry type
+ */
+export interface AttributeSchema {
+  /** Fields for polygon/multi-polygon features */
+  polygon?: AttributeFieldDefinition[];
+  /** Fields for line/multi-line features */
+  line?: AttributeFieldDefinition[];
+  /** Fields for point features */
+  point?: AttributeFieldDefinition[];
+  /** Common fields for all geometry types */
+  common?: AttributeFieldDefinition[];
+}
+
+/**
+ * Event fired when feature attributes change
+ */
+export interface AttributeChangeEvent {
+  /** The feature with updated properties */
+  feature: Feature;
+  /** Properties before the change */
+  previousProperties: GeoJsonProperties;
+  /** Properties after the change */
+  newProperties: GeoJsonProperties;
+  /** Whether this is a newly created feature */
+  isNewFeature: boolean;
 }
