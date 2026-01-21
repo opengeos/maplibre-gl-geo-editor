@@ -127,6 +127,9 @@ export class GeoEditor implements IControl {
   private isNewFeature: boolean = false;
   private originalProperties: Record<string, unknown> | null = null;
 
+  // Style data listener for modifying Geoman's vertex markers
+  private boundStyleDataHandler: (() => void) | null = null;
+
   constructor(options: GeoEditorOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
@@ -197,6 +200,9 @@ export class GeoEditor implements IControl {
     this.setupScaleHandler();
     this.setupMultiDragHandler();
 
+    // Setup styledata listener to modify Geoman's vertex markers when layers change
+    this.setupVertexMarkerStyleListener();
+
     // Setup geoman event listener if geoman is available
     this.setupGeomanEvents();
 
@@ -216,6 +222,7 @@ export class GeoEditor implements IControl {
     this.removeSelectionHandler();
     this.removeScaleHandler();
     this.removeMultiDragHandler();
+    this.removeVertexMarkerStyleListener();
     this.disableAllModes();
 
     // Cleanup popup and attribute panel
@@ -328,6 +335,24 @@ export class GeoEditor implements IControl {
   }
 
   /**
+   * Calculate click tolerance in kilometers based on current zoom level.
+   * At lower zoom levels (zoomed out), we need a larger geographic tolerance
+   * to achieve a reasonable pixel-based click area.
+   */
+  private getClickToleranceKm(): number {
+    const zoom = this.map.getZoom();
+    // Base tolerance in pixels (how many pixels away from a feature counts as a hit)
+    const pixelTolerance = 15;
+    // At zoom 0, the world is ~40,000 km wide in 256 pixels
+    // Each zoom level doubles the resolution
+    const worldWidthKm = 40075; // Earth's circumference in km
+    const tileSize = 512; // MapLibre default tile size
+    const pixelsAtZoom = tileSize * Math.pow(2, zoom);
+    const kmPerPixel = worldWidthKm / pixelsAtZoom;
+    return kmPerPixel * pixelTolerance;
+  }
+
+  /**
    * Find a feature at a given point
    */
   private findFeatureAtPoint(lng: number, lat: number): { feature: Feature; geomanData: GeomanFeatureData } | null {
@@ -338,6 +363,9 @@ export class GeoEditor implements IControl {
     const clickPoint: [number, number] = [lng, lat];
     const point = turf.point(clickPoint);
     let result: { feature: Feature; geomanData: GeomanFeatureData } | null = null;
+
+    // Calculate zoom-aware tolerance for point and line hit detection
+    const toleranceKm = this.getClickToleranceKm();
 
     // Try to get all features first using getAll()
     let allFeatures: Feature[] = [];
@@ -390,13 +418,13 @@ export class GeoEditor implements IControl {
         if (feature.geometry.type === 'Point') {
           const featurePoint = turf.point((feature.geometry as Point).coordinates as [number, number]);
           const distance = turf.distance(point, featurePoint, { units: 'kilometers' });
-          isHit = distance < 0.5;
+          isHit = distance < toleranceKm;
         } else if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
           const inside = turf.booleanPointInPolygon(point, feature as Feature<Polygon>);
           isHit = inside;
         } else if (feature.geometry.type === 'LineString' || feature.geometry.type === 'MultiLineString') {
           const nearestPoint = turf.nearestPointOnLine(feature as Feature<LineString>, point);
-          isHit = nearestPoint.properties.dist !== undefined && nearestPoint.properties.dist < 0.1;
+          isHit = nearestPoint.properties.dist !== undefined && nearestPoint.properties.dist < toleranceKm;
         }
 
         if (isHit) {
@@ -933,12 +961,81 @@ export class GeoEditor implements IControl {
       this.enableFreehandMode();
     } else if (this.geoman) {
       this.geoman.enableDraw(mode);
+      // Apply semi-transparent vertex marker styles after a short delay
+      // to allow Geoman to create its drawing layers
+      setTimeout(() => this.applyVertexMarkerStyles(), 50);
     }
 
     this.state.activeDrawMode = mode;
     this.state.isDrawing = true;
     this.options.onModeChange?.(mode);
     this.updateToolbarState();
+  }
+
+  /**
+   * Apply semi-transparent styles to Geoman's vertex markers during drawing.
+   * Geoman creates circle layers for vertex markers with specific naming patterns.
+   */
+  private applyVertexMarkerStyles(): void {
+    if (!this.map) return;
+
+    const style = this.map.getStyle();
+    if (!style || !style.layers) return;
+
+    // Find and modify Geoman's drawing marker layers
+    // Geoman typically creates layers with patterns like 'gm-' prefix or containing 'marker', 'vertex', 'handle'
+    for (const layer of style.layers) {
+      const layerId = layer.id.toLowerCase();
+
+      // Check if this is a Geoman drawing-related circle layer
+      if (
+        layer.type === 'circle' &&
+        (layerId.includes('gm-') ||
+         layerId.includes('geoman') ||
+         layerId.includes('marker') ||
+         layerId.includes('vertex') ||
+         layerId.includes('handle') ||
+         layerId.includes('temp'))
+      ) {
+        try {
+          // Make the circle fill semi-transparent
+          if (this.map.getLayer(layer.id)) {
+            this.map.setPaintProperty(layer.id, 'circle-opacity', 0.5);
+            // Also reduce stroke opacity slightly for a softer look
+            this.map.setPaintProperty(layer.id, 'circle-stroke-opacity', 0.8);
+          }
+        } catch {
+          // Ignore errors for layers that don't support these properties
+        }
+      }
+    }
+  }
+
+  /**
+   * Setup listener to apply vertex marker styles when map style changes.
+   * This ensures Geoman's drawing markers stay semi-transparent.
+   */
+  private setupVertexMarkerStyleListener(): void {
+    if (!this.map) return;
+
+    this.boundStyleDataHandler = () => {
+      // Only apply styles when actively drawing
+      if (this.state.isDrawing) {
+        this.applyVertexMarkerStyles();
+      }
+    };
+
+    this.map.on('styledata', this.boundStyleDataHandler);
+  }
+
+  /**
+   * Remove the vertex marker style listener
+   */
+  private removeVertexMarkerStyleListener(): void {
+    if (this.map && this.boundStyleDataHandler) {
+      this.map.off('styledata', this.boundStyleDataHandler);
+      this.boundStyleDataHandler = null;
+    }
   }
 
   /**
@@ -1178,6 +1275,22 @@ export class GeoEditor implements IControl {
           'line-dasharray': [3, 2],
         },
       });
+
+      // Add circle layer for points (markers, circle markers) - bright yellow/orange highlight
+      this.map.addLayer({
+        id: INTERNAL_IDS.SELECTION_CIRCLE_LAYER,
+        type: 'circle',
+        source: INTERNAL_IDS.SELECTION_SOURCE,
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': 12,
+          'circle-color': '#ffff00',
+          'circle-opacity': 0.5,
+          'circle-stroke-color': '#ff9900',
+          'circle-stroke-width': 3,
+          'circle-stroke-opacity': 1,
+        },
+      });
     } else {
       // Layers exist, move them to the top to ensure visibility
       try {
@@ -1193,6 +1306,9 @@ export class GeoEditor implements IControl {
         }
         if (this.map.getLayer(INTERNAL_IDS.SELECTION_LINE_LAYER)) {
           this.map.moveLayer(INTERNAL_IDS.SELECTION_LINE_LAYER);
+        }
+        if (this.map.getLayer(INTERNAL_IDS.SELECTION_CIRCLE_LAYER)) {
+          this.map.moveLayer(INTERNAL_IDS.SELECTION_CIRCLE_LAYER);
         }
       } catch {
         // Ignore move errors
