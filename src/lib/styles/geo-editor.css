@@ -837,3 +837,16 @@
   }
 }
 
+/* ============================================================================
+   Geoman Vertex Marker Transparency
+   ============================================================================ */
+
+/* Make Geoman's vertex marker fills semi-transparent while keeping outlines opaque */
+.marker-wrapper svg circle {
+  fill-opacity: 0.5 !important;
+}
+
+.marker-wrapper svg path {
+  fill-opacity: 0.5 !important;
+}
+
