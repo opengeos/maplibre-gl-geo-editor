@@ -164,6 +164,16 @@
   cursor: not-allowed;
 }
 
+/* History button disabled states */
+.geo-editor-tool-button[data-history]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.geo-editor-tool-button[data-history]:disabled:hover {
+  background: #f5f5f5;
+}
+
 .geo-editor-tool-button svg {
   width: 18px;
   height: 18px;

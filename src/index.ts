@@ -1,5 +1,6 @@
 // Core exports
 export { GeoEditor } from './lib/core/GeoEditor';
+export { HistoryManager } from './lib/core/HistoryManager';
 export type {
   GeoEditorOptions,
   GeoEditorState,
@@ -30,6 +31,10 @@ export type {
   GeomanFeaturesAPI,
   GeoEditorEventMap,
   GeoEditorEventType,
+  // History types
+  HistoryOperationType,
+  Command,
+  HistoryState,
 } from './lib/core/types';
 
 // Feature exports

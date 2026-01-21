@@ -106,6 +106,12 @@ export interface GeoEditorOptions {
   fitBoundsOnLoad?: boolean;
   /** Number of columns for button layout in vertical orientation (default: 1) */
   columns?: number;
+  /** Enable history (undo/redo) functionality (default: true) */
+  enableHistory?: boolean;
+  /** Maximum number of history entries (default: 50) */
+  maxHistorySize?: number;
+  /** Callback when history state changes */
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
 }
 
 export type GeoEditorOptionsRequired = Required<GeoEditorOptions>;
@@ -402,4 +408,24 @@ export interface BBox {
   minY: number;
   maxX: number;
   maxY: number;
+}
+
+// ============================================================================
+// History Types (Undo/Redo)
+// ============================================================================
+
+export type HistoryOperationType = 'create' | 'edit' | 'delete' | 'composite';
+
+export interface Command {
+  description: string;
+  type: HistoryOperationType;
+  execute(): void;
+  undo(): void;
+}
+
+export interface HistoryState {
+  canUndo: boolean;
+  canRedo: boolean;
+  undoCount: number;
+  redoCount: number;
 }

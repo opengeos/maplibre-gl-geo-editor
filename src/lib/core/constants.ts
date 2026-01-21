@@ -88,6 +88,9 @@ export const DEFAULT_OPTIONS: GeoEditorOptionsRequired = {
   showFeatureProperties: true,
   fitBoundsOnLoad: true,
   columns: 1,
+  enableHistory: true,
+  maxHistorySize: 50,
+  onHistoryChange: () => {},
 };
 
 /**

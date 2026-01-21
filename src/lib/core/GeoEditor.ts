@@ -18,7 +18,16 @@ import type {
   ScaleHandlePosition,
   GeoJsonLoadResult,
   GeoJsonSaveResult,
+  HistoryState,
 } from './types';
+import { HistoryManager } from './HistoryManager';
+import {
+  CreateFeatureCommand,
+  EditFeatureCommand,
+  DeleteFeatureCommand,
+  CompositeCommand,
+} from './commands';
+import type { CommandContext } from './commands';
 import { DEFAULT_OPTIONS, CSS_PREFIX, ADVANCED_EDIT_MODES, INTERNAL_IDS } from './constants';
 import {
   CopyFeature,
@@ -102,6 +111,11 @@ export class GeoEditor implements IControl {
   // Feature properties popup
   private propertiesPopup: maplibregl.Popup | null = null;
 
+  // History management (undo/redo)
+  private historyManager: HistoryManager | null = null;
+  private pendingEditFeature: Feature | null = null;
+  private isPerformingCompositeOperation: boolean = false;
+
   constructor(options: GeoEditorOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
@@ -129,6 +143,17 @@ export class GeoEditor implements IControl {
     this.lassoFeature = new LassoFeature();
     this.splitFeature = new SplitFeature();
     this.freehandFeature = new FreehandFeature();
+
+    // Initialize history manager if enabled
+    if (this.options.enableHistory !== false) {
+      this.historyManager = new HistoryManager(
+        this.options.maxHistorySize,
+        (canUndo, canRedo) => {
+          this.updateHistoryButtonStates(canUndo, canRedo);
+          this.options.onHistoryChange?.(canUndo, canRedo);
+        }
+      );
+    }
   }
 
   /**
@@ -1669,12 +1694,19 @@ export class GeoEditor implements IControl {
       return;
     }
 
-    // Remove original feature using provided result data
-    this.deleteGeomanFeatures([result.original]);
-    this.clearGeomanTemporaryFeatures();
-    this.clearSelection();
+    // Record composite operation before making changes
+    this.recordCompositeOperation([result.original], result.parts, 'Split');
 
-    // Add new parts
+    // Set flag to prevent individual operations from being recorded
+    this.isPerformingCompositeOperation = true;
+
+    try {
+      // Remove original feature using provided result data
+      this.deleteGeomanFeatures([result.original]);
+      this.clearGeomanTemporaryFeatures();
+      this.clearSelection();
+
+      // Add new parts
       if (this.geoman) {
         result.parts.forEach((part) => {
           this.geoman?.features.importGeoJsonFeature(part);
@@ -1683,6 +1715,9 @@ export class GeoEditor implements IControl {
           this.logSelectedFeatureCollection('created', part);
         });
       }
+    } finally {
+      this.isPerformingCompositeOperation = false;
+    }
 
     this.emitEvent('gm:split', result);
     this.disableAllModes();
@@ -1694,17 +1729,27 @@ export class GeoEditor implements IControl {
       return;
     }
 
-    // Remove original features using provided result data
-    this.deleteGeomanFeatures(result.originals);
-    this.clearGeomanTemporaryFeatures();
-    this.clearSelection();
+    // Record composite operation before making changes
+    this.recordCompositeOperation(result.originals, [result.result], 'Union');
 
-    // Add merged feature
-    if (this.geoman) {
-      this.geoman.features.importGeoJsonFeature(result.result);
-      this.options.onFeatureCreate?.(result.result);
-      this.lastCreatedFeature = result.result;
-      this.logSelectedFeatureCollection('created', result.result);
+    // Set flag to prevent individual operations from being recorded
+    this.isPerformingCompositeOperation = true;
+
+    try {
+      // Remove original features using provided result data
+      this.deleteGeomanFeatures(result.originals);
+      this.clearGeomanTemporaryFeatures();
+      this.clearSelection();
+
+      // Add merged feature
+      if (this.geoman) {
+        this.geoman.features.importGeoJsonFeature(result.result);
+        this.options.onFeatureCreate?.(result.result);
+        this.lastCreatedFeature = result.result;
+        this.logSelectedFeatureCollection('created', result.result);
+      }
+    } finally {
+      this.isPerformingCompositeOperation = false;
     }
 
     this.emitEvent('gm:union', result);
@@ -1717,17 +1762,29 @@ export class GeoEditor implements IControl {
       return;
     }
 
-    // Remove original features using provided result data
-    this.deleteGeomanFeatures([result.base, ...result.subtracted]);
-    this.clearGeomanTemporaryFeatures();
-    this.clearSelection();
+    // Record composite operation before making changes
+    const deletedFeatures = [result.base, ...result.subtracted];
+    const createdFeatures = result.result ? [result.result] : [];
+    this.recordCompositeOperation(deletedFeatures, createdFeatures, 'Difference');
 
-    // Add result if not null (complete subtraction)
-    if (result.result && this.geoman) {
-      this.geoman.features.importGeoJsonFeature(result.result);
-      this.options.onFeatureCreate?.(result.result);
-      this.lastCreatedFeature = result.result;
-      this.logSelectedFeatureCollection('created', result.result);
+    // Set flag to prevent individual operations from being recorded
+    this.isPerformingCompositeOperation = true;
+
+    try {
+      // Remove original features using provided result data
+      this.deleteGeomanFeatures([result.base, ...result.subtracted]);
+      this.clearGeomanTemporaryFeatures();
+      this.clearSelection();
+
+      // Add result if not null (complete subtraction)
+      if (result.result && this.geoman) {
+        this.geoman.features.importGeoJsonFeature(result.result);
+        this.options.onFeatureCreate?.(result.result);
+        this.lastCreatedFeature = result.result;
+        this.logSelectedFeatureCollection('created', result.result);
+      }
+    } finally {
+      this.isPerformingCompositeOperation = false;
     }
 
     this.emitEvent('gm:difference', result);
@@ -1738,16 +1795,26 @@ export class GeoEditor implements IControl {
     result: SimplifyResult,
     options: { clearSelection: boolean; disableModes: boolean }
   ): void {
-    // Remove original feature
-    this.deleteGeomanFeatures([result.original]);
-    this.clearGeomanTemporaryFeatures();
+    // Record composite operation before making changes (simplify is delete + create)
+    this.recordCompositeOperation([result.original], [result.result], 'Simplify');
 
-    // Add simplified feature
-    if (this.geoman) {
-      result.result.id = this.getGeomanIdFromFeature(result.original) ?? result.result.id;
-      this.geoman.features.importGeoJsonFeature(result.result);
-      this.options.onFeatureEdit?.(result.result, result.original);
-      this.lastEditedFeature = result.result;
+    // Set flag to prevent individual operations from being recorded
+    this.isPerformingCompositeOperation = true;
+
+    try {
+      // Remove original feature
+      this.deleteGeomanFeatures([result.original]);
+      this.clearGeomanTemporaryFeatures();
+
+      // Add simplified feature
+      if (this.geoman) {
+        result.result.id = this.getGeomanIdFromFeature(result.original) ?? result.result.id;
+        this.geoman.features.importGeoJsonFeature(result.result);
+        this.options.onFeatureEdit?.(result.result, result.original);
+        this.lastEditedFeature = result.result;
+      }
+    } finally {
+      this.isPerformingCompositeOperation = false;
     }
 
     this.emitEvent('gm:simplify', result);
@@ -1824,6 +1891,12 @@ export class GeoEditor implements IControl {
     if (advancedModes.length > 0) {
       const advancedGroup = this.createToolGroup('Advanced', advancedModes, 'edit');
       toolsWrapper.appendChild(advancedGroup);
+    }
+
+    // History tools group (undo/redo)
+    if (this.historyManager) {
+      const historyGroup = this.createHistoryToolsGroup();
+      toolsWrapper.appendChild(historyGroup);
     }
 
     // Helper tools group (snapping)
@@ -2467,6 +2540,18 @@ export class GeoEditor implements IControl {
 
   private setupKeyboardShortcuts(): void {
     this.boundKeyHandler = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + Z - Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        this.undo();
+        e.preventDefault();
+        return;
+      }
+      // Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z - Redo
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey) || (e.key === 'Z' && e.shiftKey))) {
+        this.redo();
+        e.preventDefault();
+        return;
+      }
       // Ctrl/Cmd + C
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         this.copySelectedFeatures();
@@ -2518,23 +2603,40 @@ export class GeoEditor implements IControl {
     this.geoman.setGlobalEventsListener((event) => {
       const eventName = (event as { name?: string; type?: string }).name ?? event.type ?? '';
       const eventFeature = this.extractFeatureFromEvent((event as { feature?: unknown }).feature);
+      const eventAction = (event as { action?: string }).action ?? '';
 
       // Handle feature creation
       if ((eventName === 'gm:create' || event.type === 'gm:create') && eventFeature) {
         this.lastCreatedFeature = eventFeature;
         this.options.onFeatureCreate?.(eventFeature);
         this.logSelectedFeatureCollection('created', eventFeature);
+        // Record create operation in history
+        this.recordCreateOperation(eventFeature);
       }
 
-      if ((event as { action?: string }).action === 'feature_edit_end' && eventFeature) {
+      // Handle feature edit start - store pre-edit state
+      if (eventAction === 'feature_edit_start' && eventFeature) {
+        this.pendingEditFeature = turf.clone(eventFeature);
+      }
+
+      // Handle feature edit end
+      if (eventAction === 'feature_edit_end' && eventFeature) {
         this.lastEditedFeature = eventFeature;
         this.logSelectedFeatureCollection('edited', eventFeature);
+        // Record edit operation in history
+        if (this.pendingEditFeature) {
+          this.recordEditOperation(this.pendingEditFeature, eventFeature);
+          this.pendingEditFeature = null;
+        }
       }
 
-      if ((event as { action?: string }).action === 'feature_removed' && eventFeature) {
+      // Handle feature removed
+      if (eventAction === 'feature_removed' && eventFeature) {
         this.lastDeletedFeature = eventFeature;
         this.lastDeletedFeatureId = this.getGeomanIdFromFeature(eventFeature);
         this.logSelectedFeatureCollection('deleted', eventFeature);
+        // Record delete operation in history
+        this.recordDeleteOperation(eventFeature);
       }
 
       // Handle mode changes
@@ -2551,5 +2653,216 @@ export class GeoEditor implements IControl {
   private emitEvent(type: string, detail: unknown): void {
     const event = new CustomEvent(type, { detail });
     this.map.getContainer().dispatchEvent(event);
+  }
+
+  // ============================================================================
+  // History Management (Undo/Redo)
+  // ============================================================================
+
+  /**
+   * Undo the last operation.
+   * @returns true if undo was successful, false if nothing to undo
+   */
+  undo(): boolean {
+    if (!this.historyManager) {
+      return false;
+    }
+    return this.historyManager.undo();
+  }
+
+  /**
+   * Redo the last undone operation.
+   * @returns true if redo was successful, false if nothing to redo
+   */
+  redo(): boolean {
+    if (!this.historyManager) {
+      return false;
+    }
+    return this.historyManager.redo();
+  }
+
+  /**
+   * Check if undo is available.
+   */
+  canUndo(): boolean {
+    return this.historyManager?.canUndo() ?? false;
+  }
+
+  /**
+   * Check if redo is available.
+   */
+  canRedo(): boolean {
+    return this.historyManager?.canRedo() ?? false;
+  }
+
+  /**
+   * Clear all history.
+   */
+  clearHistory(): void {
+    this.historyManager?.clear();
+  }
+
+  /**
+   * Get the current history state.
+   * @returns History state with canUndo, canRedo, and counts, or null if history is disabled
+   */
+  getHistoryState(): HistoryState | null {
+    return this.historyManager?.getState() ?? null;
+  }
+
+  /**
+   * Get the command context for creating commands.
+   */
+  private getCommandContext(): CommandContext | null {
+    if (!this.geoman) {
+      return null;
+    }
+
+    return {
+      featuresApi: this.geoman.features,
+      onFeatureCreate: this.options.onFeatureCreate,
+      onFeatureDelete: this.options.onFeatureDelete,
+      onFeatureEdit: this.options.onFeatureEdit,
+    };
+  }
+
+  /**
+   * Record a create operation in history.
+   */
+  private recordCreateOperation(feature: Feature): void {
+    if (!this.historyManager || this.historyManager.isExecutingCommand() || this.isPerformingCompositeOperation) {
+      return;
+    }
+
+    const context = this.getCommandContext();
+    if (!context) {
+      return;
+    }
+
+    const command = new CreateFeatureCommand(feature, context);
+    this.historyManager.record(command);
+  }
+
+  /**
+   * Record an edit operation in history.
+   */
+  private recordEditOperation(oldFeature: Feature, newFeature: Feature): void {
+    if (!this.historyManager || this.historyManager.isExecutingCommand() || this.isPerformingCompositeOperation) {
+      return;
+    }
+
+    const context = this.getCommandContext();
+    if (!context) {
+      return;
+    }
+
+    const command = new EditFeatureCommand(oldFeature, newFeature, context);
+    this.historyManager.record(command);
+  }
+
+  /**
+   * Record a delete operation in history.
+   */
+  private recordDeleteOperation(feature: Feature): void {
+    if (!this.historyManager || this.historyManager.isExecutingCommand() || this.isPerformingCompositeOperation) {
+      return;
+    }
+
+    const context = this.getCommandContext();
+    if (!context) {
+      return;
+    }
+
+    const command = new DeleteFeatureCommand(feature, context);
+    this.historyManager.record(command);
+  }
+
+  /**
+   * Record a composite operation (union, difference, split) in history.
+   */
+  private recordCompositeOperation(
+    deletedFeatures: Feature[],
+    createdFeatures: Feature[],
+    description: string
+  ): void {
+    if (!this.historyManager || this.historyManager.isExecutingCommand()) {
+      return;
+    }
+
+    const context = this.getCommandContext();
+    if (!context) {
+      return;
+    }
+
+    const commands: (DeleteFeatureCommand | CreateFeatureCommand)[] = [];
+
+    // Add delete commands for original features
+    for (const feature of deletedFeatures) {
+      commands.push(new DeleteFeatureCommand(feature, context));
+    }
+
+    // Add create commands for new features
+    for (const feature of createdFeatures) {
+      commands.push(new CreateFeatureCommand(feature, context));
+    }
+
+    const composite = new CompositeCommand(commands, description);
+    this.historyManager.record(composite);
+  }
+
+  /**
+   * Update history button states (enabled/disabled).
+   */
+  private updateHistoryButtonStates(canUndo: boolean, canRedo: boolean): void {
+    const undoBtn = this.container.querySelector('[data-history="undo"]') as HTMLButtonElement | null;
+    const redoBtn = this.container.querySelector('[data-history="redo"]') as HTMLButtonElement | null;
+
+    if (undoBtn) {
+      undoBtn.disabled = !canUndo;
+    }
+    if (redoBtn) {
+      redoBtn.disabled = !canRedo;
+    }
+  }
+
+  /**
+   * Create the history tools group (undo/redo buttons).
+   */
+  private createHistoryToolsGroup(): HTMLElement {
+    const group = document.createElement('div');
+    group.className = `${CSS_PREFIX}-tool-group`;
+
+    if (this.options.showLabels) {
+      const groupLabel = document.createElement('div');
+      groupLabel.className = `${CSS_PREFIX}-tool-group-label`;
+      groupLabel.textContent = 'History';
+      group.appendChild(groupLabel);
+    }
+
+    const buttons = document.createElement('div');
+    buttons.className = `${CSS_PREFIX}-tool-buttons`;
+
+    // Undo button
+    const undoBtn = document.createElement('button');
+    undoBtn.className = `${CSS_PREFIX}-tool-button`;
+    undoBtn.dataset.history = 'undo';
+    undoBtn.title = 'Undo (Ctrl+Z)';
+    undoBtn.disabled = true;
+    undoBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M12.5 8c-2.65 0-5.05 1.04-6.93 2.75L2.5 7.69v7.81h7.81l-3.12-3.12c1.36-1.2 3.13-1.88 5.04-1.88 3.31 0 6.13 2.04 7.31 4.94l2.33-.91C20.32 10.93 16.73 8 12.5 8z" fill="currentColor"/></svg>';
+    undoBtn.addEventListener('click', () => this.undo());
+    buttons.appendChild(undoBtn);
+
+    // Redo button
+    const redoBtn = document.createElement('button');
+    redoBtn.className = `${CSS_PREFIX}-tool-button`;
+    redoBtn.dataset.history = 'redo';
+    redoBtn.title = 'Redo (Ctrl+Y)';
+    redoBtn.disabled = true;
+    redoBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M18.43 10.75C16.55 9.04 14.15 8 11.5 8c-4.23 0-7.82 2.93-9.37 6.53l2.33.91c1.18-2.9 4-4.94 7.31-4.94 1.91 0 3.68.68 5.04 1.88l-3.12 3.12h7.81V7.69l-3.07 3.06z" fill="currentColor"/></svg>';
+    redoBtn.addEventListener('click', () => this.redo());
+    buttons.appendChild(redoBtn);
+
+    group.appendChild(buttons);
+    return group;
   }
 }
