@@ -5,7 +5,6 @@ import * as turf from '@turf/turf';
  * Generate a unique ID for a feature
  */
 export function generateFeatureId(): string {
-  // return `feature_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   return `feature_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 }
 
