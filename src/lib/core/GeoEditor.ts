@@ -3308,7 +3308,7 @@ export class GeoEditor implements IControl {
 
   private setupKeyboardShortcuts(): void {
     this.boundKeyHandler = (e: KeyboardEvent) => {
-      // check text area, or event target are input, or editable contents
+      // Check whether the event target is an input, textarea, or other editable content.
       const isInputField =
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement ||
