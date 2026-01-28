@@ -991,11 +991,11 @@ export class GeoEditor implements IControl {
       if (
         layer.type === 'circle' &&
         (layerId.includes('gm-') ||
-         layerId.includes('geoman') ||
-         layerId.includes('marker') ||
-         layerId.includes('vertex') ||
-         layerId.includes('handle') ||
-         layerId.includes('temp'))
+          layerId.includes('geoman') ||
+          layerId.includes('marker') ||
+          layerId.includes('vertex') ||
+          layerId.includes('handle') ||
+          layerId.includes('temp'))
       ) {
         try {
           // Make the circle fill semi-transparent
@@ -3308,6 +3308,12 @@ export class GeoEditor implements IControl {
 
   private setupKeyboardShortcuts(): void {
     this.boundKeyHandler = (e: KeyboardEvent) => {
+      // Check whether the event target is an input, textarea, or other editable content.
+      const isInputField =
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable);
+
       // Ctrl/Cmd + Z - Undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         this.undo();
@@ -3331,7 +3337,7 @@ export class GeoEditor implements IControl {
         e.preventDefault();
       }
       // Delete
-      if (e.key === 'Delete' || e.key === 'Backspace') {
+      if ( (e.key === 'Delete' || e.key === 'Backspace') && !isInputField) {
         this.deleteSelectedFeatures();
         e.preventDefault();
       }
