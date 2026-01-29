@@ -3337,10 +3337,11 @@ export class GeoEditor implements IControl {
         e.preventDefault();
       }
       // Delete
-      if ((e.key === 'Delete' || e.key === 'Backspace') && !isInputField && e.target instanceof Element && e.target.closest(`.${CSS_PREFIX}-attribute-panel`)) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !isInputField && !(e.target instanceof Element && e.target.closest(`.${CSS_PREFIX}-attribute-panel`))) {
         this.deleteSelectedFeatures();
         e.preventDefault();
       }
+
       // Enter - execute pending operation (union/difference)
       if (e.key === 'Enter' && this.pendingOperation) {
         this.executePendingOperation();
