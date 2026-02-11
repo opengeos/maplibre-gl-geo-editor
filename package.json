@@ -1,6 +1,6 @@
 {
   "name": "maplibre-gl-geo-editor",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Advanced geometry editing plugin for MapLibre GL with Geoman integration",
   "type": "module",
   "main": "./dist/index.cjs",

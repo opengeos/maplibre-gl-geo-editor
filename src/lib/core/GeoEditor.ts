@@ -3688,4 +3688,8 @@ export class GeoEditor implements IControl {
     group.appendChild(buttons);
     return group;
   }
+
+  getPanelElement(): HTMLElement | null {
+    return this.attributePanel ?? null;
+  }
 }
