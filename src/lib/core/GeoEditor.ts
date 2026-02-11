@@ -283,6 +283,11 @@ export class GeoEditor implements IControl {
       .then(({ Geoman }) => {
         if (this.map && !this.geoman) {
           const geoman = new Geoman(this.map);
+          // Prevent Geoman from adding its default controls to the map
+          // (GeoEditor provides its own toolbar). The addControls() method
+          // is called asynchronously from Geoman's init(), so overriding
+          // it before the async chain resolves is safe.
+          geoman.addControls = async () => {};
           this.setGeoman(geoman);
         }
       })
