@@ -214,6 +214,11 @@ export class GeoEditor implements IControl {
       this.createAttributePanel();
     }
 
+    // Auto-initialize Geoman if not already set
+    if (!this.geoman) {
+      this._autoInitGeoman();
+    }
+
     return this.container;
   }
 
@@ -266,6 +271,25 @@ export class GeoEditor implements IControl {
     if (this.options.hideGeomanControl) {
       this.hideGeomanControl();
     }
+  }
+
+  /**
+   * Auto-initialize Geoman via dynamic import if available.
+   * This allows the GeoEditor to work without manual setGeoman() calls
+   * as long as @geoman-io/maplibre-geoman-free is installed.
+   */
+  private _autoInitGeoman(): void {
+    import('@geoman-io/maplibre-geoman-free')
+      .then(({ Geoman }) => {
+        if (this.map && !this.geoman) {
+          const geoman = new Geoman(this.map);
+          this.setGeoman(geoman);
+        }
+      })
+      .catch(() => {
+        // @geoman-io/maplibre-geoman-free not available
+        // User must call setGeoman() manually
+      });
   }
 
   /**
