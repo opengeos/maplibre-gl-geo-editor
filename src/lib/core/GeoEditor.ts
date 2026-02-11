@@ -288,6 +288,10 @@ export class GeoEditor implements IControl {
           // is called asynchronously from Geoman's init(), so overriding
           // it before the async chain resolves is safe.
           geoman.addControls = async () => {};
+          // Also override removeControls to a no-op since addControls was
+          // never called — calling removeControls would try to detach events
+          // that were never attached, causing console warnings.
+          geoman.removeControls = () => {};
           this.setGeoman(geoman);
         }
       })
