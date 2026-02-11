@@ -1,6 +1,9 @@
 // Core exports
 export { GeoEditor } from './lib/core/GeoEditor';
 export { HistoryManager } from './lib/core/HistoryManager';
+
+// Adapter export
+export { GeoEditorLayerAdapter } from './lib/adapters/GeoEditorLayerAdapter';
 export type {
   GeoEditorOptions,
   GeoEditorState,
