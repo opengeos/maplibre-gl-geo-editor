@@ -130,6 +130,9 @@ export class GeoEditor implements IControl {
   // Style data listener for modifying Geoman's vertex markers
   private boundStyleDataHandler: (() => void) | null = null;
 
+  // Event handlers for on()/off() API
+  private _eventHandlers: globalThis.Map<string, Set<(data?: unknown) => void>> = new globalThis.Map();
+
   constructor(options: GeoEditorOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
 
@@ -2730,6 +2733,8 @@ export class GeoEditor implements IControl {
         wrapper.style.display = this.state.collapsed ? 'none' : '';
       }
     }
+
+    this._emitControlEvent(this.state.collapsed ? 'collapse' : 'expand');
   }
 
   /**
@@ -2745,6 +2750,44 @@ export class GeoEditor implements IControl {
   setCollapsed(collapsed: boolean): void {
     if (this.state.collapsed !== collapsed) {
       this.toggleCollapse();
+    }
+  }
+
+  /**
+   * Expand the toolbar (show tools)
+   */
+  expand(): void {
+    this.setCollapsed(false);
+  }
+
+  /**
+   * Collapse the toolbar (hide tools)
+   */
+  collapse(): void {
+    this.setCollapsed(true);
+  }
+
+  /**
+   * Register an event handler.
+   */
+  on(event: string, handler: (data?: unknown) => void): void {
+    if (!this._eventHandlers.has(event)) {
+      this._eventHandlers.set(event, new Set());
+    }
+    this._eventHandlers.get(event)!.add(handler);
+  }
+
+  /**
+   * Remove an event handler.
+   */
+  off(event: string, handler: (data?: unknown) => void): void {
+    this._eventHandlers.get(event)?.delete(handler);
+  }
+
+  private _emitControlEvent(event: string, data?: unknown): void {
+    const handlers = this._eventHandlers.get(event);
+    if (handlers) {
+      handlers.forEach((handler) => handler(data));
     }
   }
 
