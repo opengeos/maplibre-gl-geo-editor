@@ -88,7 +88,7 @@ export const DEFAULT_OPTIONS: GeoEditorOptionsRequired = {
   onGeoJsonSave: () => {},
   showFeatureProperties: true,
   fitBoundsOnLoad: true,
-  columns: 1,
+  columns: 2,
   enableHistory: true,
   maxHistorySize: 50,
   onHistoryChange: () => {},
