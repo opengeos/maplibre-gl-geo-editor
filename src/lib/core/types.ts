@@ -397,7 +397,7 @@ export interface GeomanFeaturesAPI {
   forEach: (callback: (feature: GeomanFeatureData) => void) => void;
   tmpForEach?: (callback: (feature: GeomanFeatureData) => void) => void;
   has: (sourceName: string, featureId: string) => boolean;
-  delete: (featureData: GeomanFeatureData) => void | Promise<void>;
+  delete: (featureData: GeomanFeatureData) => void;
   // deleteAll and importGeoJson are synchronous in older geoman and async in
   // current geoman; the return types cover both so callers can `await` either.
   deleteAll: () => void | Promise<void>;

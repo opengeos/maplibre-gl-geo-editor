@@ -24,4 +24,12 @@ describe('resolveImportedCount', () => {
   it('preserves an explicit zero success count', () => {
     expect(resolveImportedCount({ stats: { success: 0, failed: 2 } }, 9)).toBe(0);
   });
+
+  it('falls back from an empty stats object to flat success', () => {
+    expect(resolveImportedCount({ stats: {}, success: 5 }, 0)).toBe(5);
+  });
+
+  it('preserves an explicit zero in the flat success field', () => {
+    expect(resolveImportedCount({ success: 0 }, 9)).toBe(0);
+  });
 });
