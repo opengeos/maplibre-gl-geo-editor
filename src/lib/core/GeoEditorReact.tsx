@@ -73,7 +73,10 @@ export function useGeoEditor(
   deleteSelected: () => void;
   clearSelection: () => void;
   openFileDialog: () => void;
-  loadGeoJson: (geoJson: FeatureCollection | Feature, filename?: string) => GeoJsonLoadResult | undefined;
+  loadGeoJson: (
+    geoJson: FeatureCollection | Feature,
+    filename?: string
+  ) => Promise<GeoJsonLoadResult> | undefined;
   saveGeoJson: (filename?: string) => GeoJsonSaveResult | undefined;
 } {
   const controlRef = useRef<GeoEditor | null>(null);

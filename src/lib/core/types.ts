@@ -10,6 +10,7 @@ import type {
   GeoJsonProperties,
   Geometry,
 } from 'geojson';
+import type { GeomanImportResult } from './importResult';
 import type { MapMouseEvent, MapTouchEvent } from 'maplibre-gl';
 
 // ============================================================================
@@ -396,9 +397,14 @@ export interface GeomanFeaturesAPI {
   forEach: (callback: (feature: GeomanFeatureData) => void) => void;
   tmpForEach?: (callback: (feature: GeomanFeatureData) => void) => void;
   has: (sourceName: string, featureId: string) => boolean;
-  delete: (featureData: GeomanFeatureData) => void;
-  deleteAll: () => void;
-  importGeoJson: (geoJson: FeatureCollection, options?: { overwrite?: boolean }) => { success: number; failed: number };
+  delete: (featureData: GeomanFeatureData) => void | Promise<void>;
+  // deleteAll and importGeoJson are synchronous in older geoman and async in
+  // current geoman; the return types cover both so callers can `await` either.
+  deleteAll: () => void | Promise<void>;
+  importGeoJson: (
+    geoJson: FeatureCollection,
+    options?: { overwrite?: boolean }
+  ) => GeomanImportResult | Promise<GeomanImportResult>;
   importGeoJsonFeature: (feature: Feature) => GeomanFeatureData | null;
   getFeatureByMouseEvent: (options: {
     event: MapMouseEvent | MapTouchEvent;
