@@ -24,6 +24,7 @@ import type {
   AttributeChangeEvent,
 } from './types';
 import { HistoryManager } from './HistoryManager';
+import { resolveImportedCount, type GeomanImportResult } from './importResult';
 import {
   CreateFeatureCommand,
   EditFeatureCommand,
@@ -2966,13 +2967,13 @@ export class GeoEditor implements IControl {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const content = e.target?.result as string;
         const geoJson = JSON.parse(content);
-        this.loadGeoJson(geoJson, file.name);
+        await this.loadGeoJson(geoJson, file.name);
       } catch (error) {
-        console.error('GeoEditor: Failed to parse GeoJSON file:', error);
+        console.error('GeoEditor: Failed to load GeoJSON file:', error);
 
         const errorInfo = {
           filename: file.name,
@@ -2991,19 +2992,44 @@ export class GeoEditor implements IControl {
   }
 
   /**
-   * Load GeoJSON data into the editor
+   * Load GeoJSON data into the editor.
+   *
+   * Resolves once geoman has finished importing the features. This is `async`
+   * because geoman's `deleteAll` and `importGeoJson` are asynchronous in current
+   * geoman releases: awaiting them prevents a reload from racing the previous
+   * clear, and lets the returned `count` reflect the actual import result rather
+   * than a not-yet-resolved promise.
+   *
    * @param geoJson - FeatureCollection or Feature to load
    * @param filename - Optional filename for logging
    * @returns Result of the load operation
    */
-  loadGeoJson(geoJson: FeatureCollection | Feature, filename: string = 'loaded.geojson'): GeoJsonLoadResult {
+  async loadGeoJson(
+    geoJson: FeatureCollection | Feature,
+    filename: string = 'loaded.geojson'
+  ): Promise<GeoJsonLoadResult> {
     if (!this.geoman) {
       throw new Error('Geoman not initialized');
     }
 
-    // Clear existing features
+    // Geoman initializes its feature sources asynchronously; importing before it
+    // is ready fails with "Missing source for feature creation" and silently
+    // drops the features. Wait for readiness when the running geoman exposes it.
+    const geoman = this.geoman as {
+      loaded?: boolean;
+      waitForGeomanLoaded?: () => Promise<unknown>;
+    };
+    if (geoman.loaded === false && typeof geoman.waitForGeomanLoaded === 'function') {
+      try {
+        await geoman.waitForGeomanLoaded();
+      } catch {
+        /* best effort; the import below will surface a real failure */
+      }
+    }
+
+    // Clear existing features (await so a reload cannot race the new import)
     try {
-      this.geoman.features.deleteAll();
+      await this.geoman.features.deleteAll();
     } catch {
       // Fallback: delete features one by one
       this.geoman.features.forEach((fd) => {
@@ -3029,12 +3055,14 @@ export class GeoEditor implements IControl {
       throw new Error('Invalid GeoJSON: expected Feature or FeatureCollection');
     }
 
-    // Import the features
-    const importResult = this.geoman.features.importGeoJson(featureCollection);
+    // Import the features and wait for completion before reading the count.
+    const importResult = (await this.geoman.features.importGeoJson(
+      featureCollection
+    )) as GeomanImportResult;
 
     const result: GeoJsonLoadResult = {
       features: featureCollection.features,
-      count: importResult.success,
+      count: resolveImportedCount(importResult, featureCollection.features.length),
       filename,
     };
 
