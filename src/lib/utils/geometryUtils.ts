@@ -1,6 +1,5 @@
 import type { Feature, Polygon, LineString, Point, Position } from 'geojson';
 import * as turf from '@turf/turf';
-import { structuredClone } from 'node:worker_threads';
 
 /**
  * Generate a unique ID for a feature
