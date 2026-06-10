@@ -1,5 +1,6 @@
 import type { Feature, Polygon, LineString, Point, Position } from 'geojson';
 import * as turf from '@turf/turf';
+import { structuredClone } from 'node:worker_threads';
 
 /**
  * Generate a unique ID for a feature
@@ -167,10 +168,9 @@ export function roundCoordinates(
   coordinates: Position,
   precision: number = 6
 ): Position {
-  return [
-    Number(coordinates[0].toFixed(precision)),
-    Number(coordinates[1].toFixed(precision)),
-  ];
+  return coordinates.map((value) =>
+    Number(value.toFixed(precision))
+  ) as Position;
 }
 
 /**
@@ -181,9 +181,13 @@ export function positionsEqual(
   pos2: Position,
   tolerance: number = 1e-9
 ): boolean {
-  return (
-    Math.abs(pos1[0] - pos2[0]) < tolerance &&
-    Math.abs(pos1[1] - pos2[1]) < tolerance
+  if (pos1.length !== pos2.length) {
+    return false;
+  }
+
+  return pos1.every(
+    (value, index) =>
+      Math.abs(value - pos2[index]) < tolerance
   );
 }
 
@@ -198,5 +202,9 @@ export function getVertexCount(feature: Feature): number {
  * Deep clone a feature
  */
 export function cloneFeature<T extends Feature>(feature: T): T {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(feature);
+  }
+
   return JSON.parse(JSON.stringify(feature)) as T;
 }
