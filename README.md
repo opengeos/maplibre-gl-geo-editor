@@ -11,12 +11,16 @@ A powerful MapLibre GL plugin for creating and editing geometries. Extends the f
 ## Features
 
 ### Draw Tools
-- **Polygon** - Draw polygons by clicking points
-- **Line** - Draw polylines
+- **Polygon** - Draw polygons by clicking points; **double-click or right-click to finish**
+- **Line** - Draw polylines; **double-click or right-click to finish**
 - **Rectangle** - Draw rectangles
 - **Circle** - Draw circles
 - **Marker** - Place point markers
 - **Freehand** - Draw shapes by dragging (custom implementation)
+
+> Polygons and lines can also be completed the Geoman way — by clicking the
+> first/last vertex — but a double-click or right-click ends the shape too, as
+> in most drawing tools.
 
 ### Basic Edit Tools (via Geoman Free)
 - **Drag** - Move features on the map

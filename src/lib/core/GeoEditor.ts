@@ -70,6 +70,9 @@ export class GeoEditor implements IControl {
   // Event listeners
   private boundKeyHandler: ((e: KeyboardEvent) => void) | null = null;
   private boundClickHandler: ((e: MapMouseEvent) => void) | null = null;
+  // Finish an in-progress polygon/line draw on double-click or right-click.
+  private boundDrawFinishDblClick: ((e: MapMouseEvent) => void) | null = null;
+  private boundDrawFinishContextMenu: ((e: MapMouseEvent) => void) | null = null;
   private boundScaleMouseDown: ((e: MapMouseEvent) => void) | null = null;
   private boundScaleMouseMove: ((e: MapMouseEvent) => void) | null = null;
   private boundScaleMouseUp: ((e: MapMouseEvent) => void) | null = null;
@@ -203,6 +206,7 @@ export class GeoEditor implements IControl {
     this.setupSelectionHandler();
     this.setupScaleHandler();
     this.setupMultiDragHandler();
+    this.setupDrawFinishHandlers();
 
     // Setup styledata listener to modify Geoman's vertex markers when layers change
     this.setupVertexMarkerStyleListener();
@@ -231,6 +235,7 @@ export class GeoEditor implements IControl {
     this.removeSelectionHandler();
     this.removeScaleHandler();
     this.removeMultiDragHandler();
+    this.removeDrawFinishHandlers();
     this.removeVertexMarkerStyleListener();
     this.disableAllModes();
 
@@ -1182,6 +1187,146 @@ export class GeoEditor implements IControl {
     this.applySnappingState();
 
     // Note: snapping state is NOT reset here - it's independent
+  }
+
+  // ============================================================================
+  // Finish polygon/line draw on double-click or right-click
+  // ============================================================================
+
+  /**
+   * Attach map listeners that finish an in-progress polygon or line on a
+   * double-click or right-click.
+   *
+   * Geoman free only completes these shapes when the user clicks the first or
+   * last vertex, which is unintuitive: every other drawing tool ends a polygon
+   * with a double-click (or right-click). These handlers add that gesture while
+   * leaving the click-the-first-vertex behavior intact.
+   */
+  private setupDrawFinishHandlers(): void {
+    if (!this.map) return;
+
+    const handler = (e: MapMouseEvent): void => {
+      if (this.state.activeDrawMode !== 'polygon' && this.state.activeDrawMode !== 'line') {
+        return;
+      }
+      if (this.finishActiveLineOrPolygonDraw()) {
+        // Stop the gesture's default map action (double-click zoom / context menu).
+        e.preventDefault();
+      }
+    };
+
+    this.boundDrawFinishDblClick = handler;
+    this.boundDrawFinishContextMenu = handler;
+    this.map.on('dblclick', this.boundDrawFinishDblClick);
+    this.map.on('contextmenu', this.boundDrawFinishContextMenu);
+  }
+
+  /**
+   * Remove the double-click / right-click draw-finish listeners.
+   */
+  private removeDrawFinishHandlers(): void {
+    if (!this.map) return;
+    if (this.boundDrawFinishDblClick) {
+      this.map.off('dblclick', this.boundDrawFinishDblClick);
+      this.boundDrawFinishDblClick = null;
+    }
+    if (this.boundDrawFinishContextMenu) {
+      this.map.off('contextmenu', this.boundDrawFinishContextMenu);
+      this.boundDrawFinishContextMenu = null;
+    }
+  }
+
+  /**
+   * Finish the polygon or line currently being drawn, as if the user had
+   * clicked the closing vertex.
+   *
+   * This drives Geoman's own draw instance so the resulting geometry, cleanup,
+   * and `gm:create` event match a normally-finished shape. Geoman's draw
+   * internals are not part of the public API, so every access is feature-detected
+   * and the method bails (leaving drawing untouched) if the shape cannot be
+   * finished — e.g. too few vertices, or an incompatible Geoman build.
+   *
+   * @returns true when a shape was finished, false otherwise.
+   */
+  private finishActiveLineOrPolygonDraw(): boolean {
+    const mode = this.state.activeDrawMode;
+    if (mode !== 'polygon' && mode !== 'line') return false;
+    if (!this.geoman) return false;
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const instances = (this.geoman as any).actionInstances;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const instance = instances?.[`draw__${mode}`] as any;
+      const drawer = instance?.lineDrawer;
+      if (!drawer || typeof drawer.getMarkerClickEventData !== 'function') {
+        return false;
+      }
+
+      // The committed vertices placed so far (excludes the cursor-follow point).
+      const coords: unknown[] = Array.isArray(drawer.shapeLngLats)
+        ? drawer.shapeLngLats
+        : [];
+      const count = coords.length;
+      if (count === 0) return false;
+
+      // A double-click emits two `click` events before `dblclick`, so the final
+      // vertex is usually placed twice at the same spot. Detect that trailing
+      // duplicate so it can be dropped from the finished geometry. (Right-click
+      // adds no vertex, so there is nothing to trim.)
+      const hasTrailingDuplicate =
+        count >= 2 && this.lngLatsEqual(coords[count - 1], coords[count - 2]);
+
+      if (mode === 'line') {
+        // `lineFinished` keeps coordinates up to and including `markerIndex`, so
+        // point it at the last real vertex to drop the double-click duplicate.
+        const endIndex = hasTrailingDuplicate ? count - 2 : count - 1;
+        if (endIndex < 1) return false; // need at least two distinct vertices
+        const eventData = drawer.getMarkerClickEventData(endIndex);
+        if (typeof instance.lineFinished !== 'function') return false;
+        instance.lineFinished(eventData);
+        return true;
+      }
+
+      // Polygon: `polygonFinished` reads the event's geoJson directly, so trim
+      // the duplicate trailing vertex off that geometry before finishing.
+      const eventData = drawer.getMarkerClickEventData(count - 1);
+      const ring = eventData?.geoJson?.geometry?.coordinates;
+      if (hasTrailingDuplicate && Array.isArray(ring) && ring.length >= 2) {
+        ring.pop();
+      }
+      const ringLength = Array.isArray(ring) ? ring.length : count;
+      if (ringLength < 3) return false; // need at least three vertices
+      if (typeof instance.polygonFinished !== 'function') return false;
+      instance.polygonFinished(eventData);
+      return true;
+    } catch {
+      // Any incompatibility with the Geoman build leaves drawing as-is.
+      return false;
+    }
+  }
+
+  /**
+   * Compare two Geoman vertices for equality. Geoman stores vertices as either
+   * `[lng, lat]` tuples or MapLibre `LngLat` objects, so normalize both forms.
+   */
+  private lngLatsEqual(a: unknown, b: unknown): boolean {
+    const toPair = (p: unknown): [number, number] | null => {
+      if (Array.isArray(p) && typeof p[0] === 'number' && typeof p[1] === 'number') {
+        return [p[0], p[1]];
+      }
+      if (p && typeof p === 'object') {
+        const o = p as { lng?: unknown; lat?: unknown };
+        if (typeof o.lng === 'number' && typeof o.lat === 'number') {
+          return [o.lng, o.lat];
+        }
+      }
+      return null;
+    };
+    const pa = toPair(a);
+    const pb = toPair(b);
+    if (!pa || !pb) return false;
+    return Math.abs(pa[0] - pb[0]) < 1e-9 && Math.abs(pa[1] - pb[1]) < 1e-9;
   }
 
   /**
