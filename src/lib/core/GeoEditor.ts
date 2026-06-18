@@ -1152,8 +1152,15 @@ export class GeoEditor implements IControl {
    * Disable all modes
    */
   disableAllModes(): void {
+    // geoman.disableAllModes() is async and also tears down the snapping helper.
+    // Keep its promise so the snapping re-enable at the end runs AFTER that
+    // teardown settles: re-enabling synchronously lets the still-in-flight
+    // disable land afterwards and silently remove snapping, which left it off
+    // (until manually toggled off and on) every time a draw/edit tool — each of
+    // which starts by calling this method — was selected.
+    let geomanDisable: unknown;
     if (this.geoman) {
-      this.geoman.disableAllModes();
+      geomanDisable = this.geoman.disableAllModes();
     }
 
     // Disable advanced modes
@@ -1184,7 +1191,20 @@ export class GeoEditor implements IControl {
     this.state.isDrawing = false;
     this.state.isEditing = false;
     this.updateToolbarState();
-    this.applySnappingState();
+
+    // Re-apply snapping once geoman's async teardown has settled (see the note
+    // where geomanDisable is captured). Fall back to a synchronous re-apply when
+    // disableAllModes returned no promise (older geoman, or no geoman set).
+    if (
+      geomanDisable &&
+      typeof (geomanDisable as Promise<void>).then === 'function'
+    ) {
+      (geomanDisable as Promise<void>)
+        .then(() => this.applySnappingState())
+        .catch(() => this.applySnappingState());
+    } else {
+      this.applySnappingState();
+    }
 
     // Note: snapping state is NOT reset here - it's independent
   }
