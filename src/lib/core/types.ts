@@ -6,12 +6,13 @@ import type {
   LineString,
   MultiLineString,
   Point,
+  Position,
   FeatureCollection,
   GeoJsonProperties,
   Geometry,
-} from 'geojson';
-import type { GeomanImportResult } from './importResult';
-import type { MapMouseEvent, MapTouchEvent } from 'maplibre-gl';
+} from "geojson";
+import type { GeomanImportResult } from "./importResult";
+import type { MapMouseEvent, MapTouchEvent } from "maplibre-gl";
 
 // ============================================================================
 // Draw and Edit Mode Types
@@ -22,39 +23,43 @@ import type { MapMouseEvent, MapTouchEvent } from 'maplibre-gl';
  * Note: 'freehand' is implemented as a custom feature (not dependent on Geoman Pro).
  */
 export type DrawMode =
-  | 'marker'
-  | 'circle'
-  | 'circle_marker'
-  | 'ellipse'
-  | 'text_marker'
-  | 'line'
-  | 'rectangle'
-  | 'polygon'
-  | 'freehand'; // Custom implementation
+  | "marker"
+  | "circle"
+  | "circle_marker"
+  | "ellipse"
+  | "text_marker"
+  | "line"
+  | "rectangle"
+  | "polygon"
+  | "freehand"; // Custom implementation
 
 export type EditMode =
-  | 'drag'
-  | 'change'
-  | 'rotate'
-  | 'cut'
-  | 'delete'
+  | "drag"
+  | "change"
+  | "rotate"
+  | "cut"
+  | "delete"
   // Advanced modes (our implementations)
-  | 'select'
-  | 'scale'
-  | 'copy'
-  | 'split'
-  | 'union'
-  | 'difference'
-  | 'simplify'
-  | 'lasso';
+  | "select"
+  | "scale"
+  | "copy"
+  | "split"
+  | "union"
+  | "difference"
+  | "simplify"
+  | "lasso";
 
-export type HelperMode = 'snapping' | 'measurements';
+export type HelperMode = "snapping" | "measurements";
 
-export type FileMode = 'open' | 'save';
+export type FileMode = "open" | "save";
 
-export type ToolbarPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+export type ToolbarPosition =
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right";
 
-export type ToolbarOrientation = 'vertical' | 'horizontal';
+export type ToolbarOrientation = "vertical" | "horizontal";
 
 // ============================================================================
 // Configuration Options
@@ -120,7 +125,7 @@ export interface GeoEditorOptions {
   /** Callback when feature attributes change */
   onAttributeChange?: (event: AttributeChangeEvent) => void;
   /** Position of the attribute panel (default: 'right') */
-  attributePanelPosition?: 'left' | 'right';
+  attributePanelPosition?: "left" | "right";
   /** Width of the attribute panel in pixels (default: 300) */
   attributePanelWidth?: number;
   /** Maximum height of the attribute panel in pixels or CSS value (default: '80vh') */
@@ -134,7 +139,9 @@ export interface GeoEditorOptions {
 }
 
 // Make all options required except attributeSchema which can remain undefined
-export type GeoEditorOptionsRequired = Required<Omit<GeoEditorOptions, 'attributeSchema'>> & {
+export type GeoEditorOptionsRequired = Required<
+  Omit<GeoEditorOptions, "attributeSchema">
+> & {
   attributeSchema: AttributeSchema | undefined;
 };
 
@@ -182,6 +189,21 @@ export interface ScaleOptions {
   maxScale?: number;
 }
 
+export interface RotateOptions {
+  /** Maximum number of vertex pivots offered in the rotate popup */
+  maxPivotVertices?: number;
+}
+
+/** A pivot choice offered when rotating a feature by a numerical angle */
+export interface RotatePivotOption {
+  /** Stable identifier ('centroid' or 'vertex-N') */
+  id: string;
+  /** Human-readable label shown in the pivot selector */
+  label: string;
+  /** Coordinate the rotation pivots around */
+  coordinates: Position;
+}
+
 export interface SimplifyOptions {
   /** Tolerance for simplification (in degrees) */
   tolerance: number;
@@ -215,7 +237,7 @@ export interface DifferenceOptions {
 
 export interface LassoOptions {
   /** Selection mode: 'contains' or 'intersects' */
-  mode?: 'contains' | 'intersects';
+  mode?: "contains" | "intersects";
 }
 
 // ============================================================================
@@ -300,14 +322,14 @@ export interface GeoJsonSaveResult {
 // ============================================================================
 
 export type ScaleHandlePosition =
-  | 'nw'
-  | 'n'
-  | 'ne'
-  | 'e'
-  | 'se'
-  | 's'
-  | 'sw'
-  | 'w';
+  | "nw"
+  | "n"
+  | "ne"
+  | "e"
+  | "se"
+  | "s"
+  | "sw"
+  | "w";
 
 export interface ScaleHandle {
   position: ScaleHandlePosition;
@@ -319,21 +341,22 @@ export interface ScaleHandle {
 // ============================================================================
 
 export interface GeoEditorEventMap {
-  'gm:scale': { feature: Feature; scaleFactor: number };
-  'gm:scalestart': { feature: Feature };
-  'gm:scaleend': { feature: Feature; scaleFactor: number };
-  'gm:copy': { features: Feature[] };
-  'gm:paste': { features: Feature[] };
-  'gm:split': SplitResult;
-  'gm:union': UnionResult;
-  'gm:difference': DifferenceResult;
-  'gm:simplify': SimplifyResult;
-  'gm:lassostart': Record<string, never>;
-  'gm:lassoend': LassoResult;
-  'gm:selectionchange': { features: Feature[] };
-  'gm:modechange': { mode: DrawMode | EditMode | null };
-  'gm:geojsonload': GeoJsonLoadResult;
-  'gm:geojsonsave': GeoJsonSaveResult;
+  "gm:scale": { feature: Feature; scaleFactor: number };
+  "gm:scalestart": { feature: Feature };
+  "gm:scaleend": { feature: Feature; scaleFactor: number };
+  "gm:rotate": { feature: Feature; angle: number };
+  "gm:copy": { features: Feature[] };
+  "gm:paste": { features: Feature[] };
+  "gm:split": SplitResult;
+  "gm:union": UnionResult;
+  "gm:difference": DifferenceResult;
+  "gm:simplify": SimplifyResult;
+  "gm:lassostart": Record<string, never>;
+  "gm:lassoend": LassoResult;
+  "gm:selectionchange": { features: Feature[] };
+  "gm:modechange": { mode: DrawMode | EditMode | null };
+  "gm:geojsonload": GeoJsonLoadResult;
+  "gm:geojsonsave": GeoJsonSaveResult;
 }
 
 export type GeoEditorEventType = keyof GeoEditorEventMap;
@@ -347,10 +370,13 @@ export interface GeomanInstance {
   disableDraw: () => void;
   toggleDraw: (shape: DrawMode) => void;
   drawEnabled: (shape: DrawMode) => boolean;
-  enableMode: (modeType: 'draw' | 'edit' | 'helper', mode: string) => void;
-  disableMode: (modeType: 'draw' | 'edit' | 'helper', mode: string) => void;
-  toggleMode: (modeType: 'draw' | 'edit' | 'helper', mode: string) => void;
-  isModeEnabled: (modeType: 'draw' | 'edit' | 'helper', mode: string) => boolean;
+  enableMode: (modeType: "draw" | "edit" | "helper", mode: string) => void;
+  disableMode: (modeType: "draw" | "edit" | "helper", mode: string) => void;
+  toggleMode: (modeType: "draw" | "edit" | "helper", mode: string) => void;
+  isModeEnabled: (
+    modeType: "draw" | "edit" | "helper",
+    mode: string,
+  ) => boolean;
   enableGlobalEditMode: () => void;
   disableGlobalEditMode: () => void;
   toggleGlobalEditMode: () => void;
@@ -375,7 +401,7 @@ export interface GeomanInstance {
   addControls: (controlsElement?: HTMLElement) => Promise<void>;
   removeControls: () => void;
   setGlobalEventsListener: (
-    callback?: (parameters: GeomanEventParameters) => void
+    callback?: (parameters: GeomanEventParameters) => void,
   ) => void;
   features: GeomanFeaturesAPI;
 }
@@ -403,14 +429,17 @@ export interface GeomanFeaturesAPI {
   deleteAll: () => void | Promise<void>;
   importGeoJson: (
     geoJson: FeatureCollection,
-    options?: { overwrite?: boolean }
+    options?: { overwrite?: boolean },
   ) => GeomanImportResult | Promise<GeomanImportResult>;
   importGeoJsonFeature: (feature: Feature) => GeomanFeatureData | null;
   getFeatureByMouseEvent: (options: {
     event: MapMouseEvent | MapTouchEvent;
     sourceNames?: string[];
   }) => GeomanFeatureData | null;
-  getFeaturesByScreenBounds: (options: { bounds: [[number, number], [number, number]]; sourceNames?: string[] }) => GeomanFeatureData[];
+  getFeaturesByScreenBounds: (options: {
+    bounds: [[number, number], [number, number]];
+    sourceNames?: string[];
+  }) => GeomanFeatureData[];
 }
 
 export interface GeomanEventParameters {
@@ -441,7 +470,7 @@ export interface BBox {
 // History Types (Undo/Redo)
 // ============================================================================
 
-export type HistoryOperationType = 'create' | 'edit' | 'delete' | 'composite';
+export type HistoryOperationType = "create" | "edit" | "delete" | "composite";
 
 export interface Command {
   description: string;
@@ -465,13 +494,13 @@ export interface HistoryState {
  * Available field types for attribute editing
  */
 export type AttributeFieldType =
-  | 'string'
-  | 'number'
-  | 'boolean'
-  | 'select'
-  | 'date'
-  | 'color'
-  | 'textarea';
+  | "string"
+  | "number"
+  | "boolean"
+  | "select"
+  | "date"
+  | "color"
+  | "textarea";
 
 /**
  * Definition for a single attribute field

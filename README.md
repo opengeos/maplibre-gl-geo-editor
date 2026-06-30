@@ -25,7 +25,7 @@ A powerful MapLibre GL plugin for creating and editing geometries. Extends the f
 ### Basic Edit Tools (via Geoman Free)
 - **Drag** - Move features on the map
 - **Edit** - Modify feature vertices
-- **Rotate** - Rotate features
+- **Rotate** - Rotate features by dragging, or double-click / right-click a feature to type an exact angle in degrees around the centroid or a chosen vertex
 - **Cut** - Cut holes in polygons
 - **Delete** - Remove selected features (supports multi-select)
 
@@ -372,6 +372,11 @@ map.getContainer().addEventListener('gm:simplify', (e) => {
 
 map.getContainer().addEventListener('gm:lassoend', (e) => {
   console.log('Lasso selection:', e.detail);
+});
+
+map.getContainer().addEventListener('gm:rotate', (e) => {
+  console.log('Rotated feature:', e.detail);
+  // detail: { feature, angle }
 });
 
 map.getContainer().addEventListener('gm:geojsonload', (e) => {
