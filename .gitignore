@@ -36,3 +36,4 @@ dist-examples/
 .env
 .env.local
 .env.*.local
+.playwright-cli/

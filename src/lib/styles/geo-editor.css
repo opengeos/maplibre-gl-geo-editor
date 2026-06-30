@@ -104,19 +104,22 @@
 }
 
 /* Multi-column layout for button groups (vertical orientation only) */
-.geo-editor-toolbar--vertical.geo-editor-toolbar--columns-2 .geo-editor-tool-buttons {
+.geo-editor-toolbar--vertical.geo-editor-toolbar--columns-2
+  .geo-editor-tool-buttons {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 2px;
 }
 
-.geo-editor-toolbar--vertical.geo-editor-toolbar--columns-3 .geo-editor-tool-buttons {
+.geo-editor-toolbar--vertical.geo-editor-toolbar--columns-3
+  .geo-editor-tool-buttons {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2px;
 }
 
-.geo-editor-toolbar--vertical.geo-editor-toolbar--columns-4 .geo-editor-tool-buttons {
+.geo-editor-toolbar--vertical.geo-editor-toolbar--columns-4
+  .geo-editor-tool-buttons {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 2px;
@@ -551,6 +554,92 @@
 }
 
 /* ============================================================================
+   Numerical Rotation Popup
+   ============================================================================ */
+
+.geo-editor-rotate-popup .maplibregl-popup-content {
+  padding: 10px;
+}
+
+.geo-editor-rotate-popup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 180px;
+  font-size: 12px;
+}
+
+.geo-editor-rotate-popup-title {
+  font-weight: 600;
+  color: #333;
+}
+
+.geo-editor-rotate-popup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.geo-editor-rotate-popup-row span {
+  color: #555;
+}
+
+.geo-editor-rotate-popup-input,
+.geo-editor-rotate-popup-select {
+  flex: 1 1 auto;
+  max-width: 110px;
+  padding: 4px 6px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+}
+
+.geo-editor-rotate-popup-input:focus,
+.geo-editor-rotate-popup-select:focus {
+  outline: none;
+  border-color: #3388ff;
+  box-shadow: 0 0 0 2px rgba(51, 136, 255, 0.2);
+}
+
+.geo-editor-rotate-popup-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.geo-editor-rotate-popup-apply,
+.geo-editor-rotate-popup-cancel {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.geo-editor-rotate-popup-apply {
+  background: #3388ff;
+  color: #fff;
+}
+
+.geo-editor-rotate-popup-apply:hover {
+  background: #2277ee;
+}
+
+.geo-editor-rotate-popup-cancel {
+  background: #f5f5f5;
+  color: #333;
+  border-color: #ddd;
+}
+
+.geo-editor-rotate-popup-cancel:hover {
+  background: #e8e8e8;
+}
+
+/* ============================================================================
    Responsive Adjustments
    ============================================================================ */
 
@@ -585,7 +674,9 @@
   display: flex;
   flex-direction: column;
   z-index: 1000;
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
   overflow: hidden;
 }
 
@@ -686,7 +777,7 @@
 }
 
 .geo-editor-attribute-label--required::after {
-  content: ' *';
+  content: " *";
   color: #dc3545;
 }
 
@@ -700,7 +791,9 @@
   border-radius: 4px;
   font-size: 14px;
   font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
   box-sizing: border-box;
 }
 
@@ -849,4 +942,3 @@
 .marker-wrapper svg path {
   fill-opacity: 0.5 !important;
 }
-
