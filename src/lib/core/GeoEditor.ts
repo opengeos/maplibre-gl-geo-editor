@@ -110,6 +110,11 @@ export class GeoEditor implements IControl {
   // Snapping state (independent of other modes)
   private snappingEnabled: boolean = false;
 
+  // Monotonic token identifying the most recent enableDrawMode() request. Each
+  // call bumps it so a tool armed after an async teardown can bail if a newer
+  // selection has since superseded it (see enableDrawMode).
+  private drawRequestId: number = 0;
+
   // Last known feature operations
   private lastCreatedFeature: Feature | null = null;
   private lastEditedFeature: Feature | null = null;
@@ -1319,17 +1324,34 @@ export class GeoEditor implements IControl {
    * Enable a draw mode
    */
   enableDrawMode(mode: DrawMode): void {
-    this.disableAllModes();
+    // Arm the new tool only AFTER geoman's asynchronous teardown from
+    // disableAllModes() has settled. Arming synchronously lets the still-in-
+    // flight disable land afterwards and swallow the first interaction on the
+    // canvas, producing a "dead click" when switching directly from one draw
+    // tool to another (the new tool only starts drawing on the second click).
+    const requestId = ++this.drawRequestId;
+    const teardown = this.disableAllModes();
 
-    // Handle freehand with our custom implementation (not available in Geoman free)
-    if (mode === "freehand") {
-      this.enableFreehandMode();
-    } else if (this.geoman) {
-      this.geoman.enableDraw(mode);
-      // Apply semi-transparent vertex marker styles after a short delay
-      // to allow Geoman to create its drawing layers
-      setTimeout(() => this.applyVertexMarkerStyles(), 50);
-    }
+    const activate = (): void => {
+      // A later enableDrawMode() call has superseded this one while the teardown
+      // was in flight; only the most recent request may arm a tool. A plain
+      // mode comparison is not enough here: a fast A -> B -> A reselect would
+      // pass it yet still fire this stale enable before B's teardown settled.
+      if (this.drawRequestId !== requestId) return;
+
+      // Freehand uses our own implementation (not available in Geoman free) and
+      // attaches its own canvas handlers, so it is sequenced after the teardown
+      // for the same reason as the Geoman draw modes.
+      if (mode === "freehand") {
+        this.enableFreehandMode();
+      } else if (this.geoman) {
+        this.geoman.enableDraw(mode);
+        // Apply semi-transparent vertex marker styles after a short delay
+        // to allow Geoman to create its drawing layers
+        setTimeout(() => this.applyVertexMarkerStyles(), 50);
+      }
+    };
+    teardown.then(activate).catch(activate);
 
     this.state.activeDrawMode = mode;
     this.state.isDrawing = true;
@@ -1476,13 +1498,14 @@ export class GeoEditor implements IControl {
   /**
    * Disable all modes
    */
-  disableAllModes(): void {
+  disableAllModes(): Promise<void> {
     // geoman.disableAllModes() is async and also tears down the snapping helper.
     // Keep its promise so the snapping re-enable at the end runs AFTER that
     // teardown settles: re-enabling synchronously lets the still-in-flight
     // disable land afterwards and silently remove snapping, which left it off
     // (until manually toggled off and on) every time a draw/edit tool — each of
-    // which starts by calling this method — was selected.
+    // which starts by calling this method — was selected. The returned promise
+    // lets callers (e.g. enableDrawMode) sequence work after that same teardown.
     let geomanDisable: unknown;
     if (this.geoman) {
       geomanDisable = this.geoman.disableAllModes();
@@ -1518,21 +1541,26 @@ export class GeoEditor implements IControl {
     this.state.isEditing = false;
     this.updateToolbarState();
 
-    // Re-apply snapping once geoman's async teardown has settled (see the note
-    // where geomanDisable is captured). Fall back to a synchronous re-apply when
-    // disableAllModes returned no promise (older geoman, or no geoman set).
+    // Note: snapping state is NOT reset here - it's independent.
     if (
       geomanDisable &&
       typeof (geomanDisable as Promise<void>).then === "function"
     ) {
-      (geomanDisable as Promise<void>)
+      // Re-apply snapping once geoman's async teardown has settled (see the note
+      // where geomanDisable is captured), and hand the same promise back so
+      // callers (e.g. enableDrawMode) can sequence after that teardown too.
+      const settled = geomanDisable as Promise<void>;
+      settled
         .then(() => this.applySnappingState())
         .catch(() => this.applySnappingState());
-    } else {
-      this.applySnappingState();
+      return settled;
     }
 
-    // Note: snapping state is NOT reset here - it's independent
+    // Synchronous teardown (older geoman, or no geoman set): re-apply snapping
+    // right now, exactly as before, and give callers an already-resolved promise
+    // so the chaining contract is uniform.
+    this.applySnappingState();
+    return Promise.resolve();
   }
 
   // ============================================================================
