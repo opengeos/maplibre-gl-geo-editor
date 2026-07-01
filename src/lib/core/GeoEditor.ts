@@ -1319,16 +1319,27 @@ export class GeoEditor implements IControl {
    * Enable a draw mode
    */
   enableDrawMode(mode: DrawMode): void {
-    this.disableAllModes();
+    const teardown = this.disableAllModes();
 
     // Handle freehand with our custom implementation (not available in Geoman free)
     if (mode === "freehand") {
       this.enableFreehandMode();
     } else if (this.geoman) {
-      this.geoman.enableDraw(mode);
-      // Apply semi-transparent vertex marker styles after a short delay
-      // to allow Geoman to create its drawing layers
-      setTimeout(() => this.applyVertexMarkerStyles(), 50);
+      // Enable the new draw mode only AFTER geoman's asynchronous teardown from
+      // disableAllModes() has settled. Enabling synchronously lets the still-in-
+      // flight disable land afterwards and swallow the first click on the canvas,
+      // producing a "dead click" when switching directly from one draw tool to
+      // another (the new tool only starts drawing on the second click).
+      const enableDraw = (): void => {
+        // A newer mode change may have superseded this one while the teardown was
+        // in flight; only enable if this mode is still the active one.
+        if (!this.geoman || this.state.activeDrawMode !== mode) return;
+        this.geoman.enableDraw(mode);
+        // Apply semi-transparent vertex marker styles after a short delay
+        // to allow Geoman to create its drawing layers
+        setTimeout(() => this.applyVertexMarkerStyles(), 50);
+      };
+      teardown.then(enableDraw).catch(enableDraw);
     }
 
     this.state.activeDrawMode = mode;
@@ -1476,13 +1487,14 @@ export class GeoEditor implements IControl {
   /**
    * Disable all modes
    */
-  disableAllModes(): void {
+  disableAllModes(): Promise<void> {
     // geoman.disableAllModes() is async and also tears down the snapping helper.
     // Keep its promise so the snapping re-enable at the end runs AFTER that
     // teardown settles: re-enabling synchronously lets the still-in-flight
     // disable land afterwards and silently remove snapping, which left it off
     // (until manually toggled off and on) every time a draw/edit tool — each of
-    // which starts by calling this method — was selected.
+    // which starts by calling this method — was selected. The returned promise
+    // lets callers (e.g. enableDrawMode) sequence work after that same teardown.
     let geomanDisable: unknown;
     if (this.geoman) {
       geomanDisable = this.geoman.disableAllModes();
@@ -1518,21 +1530,23 @@ export class GeoEditor implements IControl {
     this.state.isEditing = false;
     this.updateToolbarState();
 
-    // Re-apply snapping once geoman's async teardown has settled (see the note
-    // where geomanDisable is captured). Fall back to a synchronous re-apply when
-    // disableAllModes returned no promise (older geoman, or no geoman set).
-    if (
+    // Promise that settles once geoman's async teardown has finished. Fall back
+    // to an already-resolved promise when disableAllModes returned no promise
+    // (older geoman, or no geoman set) so callers can always chain off it.
+    const settled: Promise<void> =
       geomanDisable &&
       typeof (geomanDisable as Promise<void>).then === "function"
-    ) {
-      (geomanDisable as Promise<void>)
-        .then(() => this.applySnappingState())
-        .catch(() => this.applySnappingState());
-    } else {
-      this.applySnappingState();
-    }
+        ? (geomanDisable as Promise<void>)
+        : Promise.resolve();
+
+    // Re-apply snapping once geoman's async teardown has settled (see the note
+    // where geomanDisable is captured).
+    settled
+      .then(() => this.applySnappingState())
+      .catch(() => this.applySnappingState());
 
     // Note: snapping state is NOT reset here - it's independent
+    return settled;
   }
 
   // ============================================================================
