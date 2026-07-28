@@ -4,7 +4,10 @@ import type {
   MapMouseEvent,
   GeoJSONSource,
 } from "maplibre-gl";
-import maplibregl from "maplibre-gl";
+// Named imports, not a default one: MapLibre v6 is ESM-only and dropped its
+// default export. `Popup`/`LngLat` are classes, so they serve as both values
+// and types.
+import { LngLat, Popup } from "maplibre-gl";
 import type {
   Feature,
   FeatureCollection,
@@ -145,10 +148,10 @@ export class GeoEditor implements IControl {
   private fileInput: HTMLInputElement | null = null;
 
   // Feature properties popup
-  private propertiesPopup: maplibregl.Popup | null = null;
+  private propertiesPopup: Popup | null = null;
 
   // Numerical-rotation popup
-  private rotatePopup: maplibregl.Popup | null = null;
+  private rotatePopup: Popup | null = null;
 
   // History management (undo/redo)
   private historyManager: HistoryManager | null = null;
@@ -802,7 +805,7 @@ export class GeoEditor implements IControl {
    *   the rotated geometry.
    */
   private openRotatePopup(
-    lngLat: maplibregl.LngLat,
+    lngLat: LngLat,
     feature: Feature,
     geomanData: GeomanFeatureData,
   ): void {
@@ -896,7 +899,7 @@ export class GeoEditor implements IControl {
       }
     });
 
-    this.rotatePopup = new maplibregl.Popup({
+    this.rotatePopup = new Popup({
       maxWidth: "240px",
       closeButton: false,
       closeOnClick: false,
@@ -2014,7 +2017,7 @@ export class GeoEditor implements IControl {
     const html = this.formatPropertiesHtml(feature.properties);
 
     // Create popup
-    this.propertiesPopup = new maplibregl.Popup({
+    this.propertiesPopup = new Popup({
       maxWidth: "300px",
       closeButton: true,
       closeOnClick: false,
