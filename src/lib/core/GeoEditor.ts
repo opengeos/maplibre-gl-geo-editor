@@ -42,6 +42,11 @@ import type {
 import { HistoryManager } from "./HistoryManager";
 import { resolveImportedCount, type GeomanImportResult } from "./importResult";
 import {
+  isPolygonFeature,
+  propagateSharedVertexMoves,
+  removePolygonOverlaps,
+} from "./topology";
+import {
   CreateFeatureCommand,
   EditFeatureCommand,
   DeleteFeatureCommand,
@@ -112,6 +117,10 @@ export class GeoEditor implements IControl {
 
   // Snapping state (independent of other modes)
   private snappingEnabled: boolean = false;
+  // Topology state (boundary reuse + shared-node editing)
+  private topologyEnabled: boolean = false;
+  // Prevent geometry updates made by topology handling from being reprocessed.
+  private applyingTopology: boolean = false;
 
   // Monotonic token identifying the most recent enableDrawMode() request. Each
   // call bumps it so a tool armed after an async teardown can bail if a newer
@@ -190,6 +199,7 @@ export class GeoEditor implements IControl {
 
     // Initialize snapping from options
     this.snappingEnabled = this.options.snappingEnabled;
+    this.topologyEnabled = this.options.topologyEnabled;
 
     // Initialize feature handlers
     this.copyFeature = new CopyFeature();
@@ -3327,8 +3337,11 @@ export class GeoEditor implements IControl {
       toolsWrapper.appendChild(historyGroup);
     }
 
-    // Helper tools group (snapping)
-    if (this.options.helperModes.includes("snapping")) {
+    // Helper tools group
+    if (
+      this.options.helperModes.includes("snapping") ||
+      this.options.helperModes.includes("topology")
+    ) {
       const helperGroup = this.createHelperToolsGroup();
       toolsWrapper.appendChild(helperGroup);
     }
@@ -3494,6 +3507,30 @@ export class GeoEditor implements IControl {
     });
 
     buttons.appendChild(snappingBtn);
+
+    if (this.options.helperModes.includes("topology")) {
+      const topologyBtn = document.createElement("button");
+      topologyBtn.className = `${CSS_PREFIX}-tool-button`;
+      topologyBtn.dataset.helper = "topology";
+      topologyBtn.title =
+        "Toggle Topology (shared boundaries and shared-node editing)";
+      topologyBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8zM9 9h6v6H9V9z" fill="currentColor"/></svg>';
+      topologyBtn.classList.toggle(
+        `${CSS_PREFIX}-tool-button--active`,
+        this.topologyEnabled,
+      );
+      topologyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.setTopology(!this.topologyEnabled);
+        topologyBtn.classList.toggle(
+          `${CSS_PREFIX}-tool-button--active`,
+          this.topologyEnabled,
+        );
+      });
+      buttons.appendChild(topologyBtn);
+    }
+
     group.appendChild(buttons);
     return group;
   }
@@ -3857,6 +3894,29 @@ export class GeoEditor implements IControl {
   setSnapping(enabled: boolean): void {
     this.snappingEnabled = enabled;
     this.applySnappingState();
+    this.container
+      ?.querySelector<HTMLElement>('[data-helper="snapping"]')
+      ?.classList.toggle(
+        `${CSS_PREFIX}-tool-button--active`,
+        this.snappingEnabled,
+      );
+  }
+
+  isTopologyEnabled(): boolean {
+    return this.topologyEnabled;
+  }
+
+  setTopology(enabled: boolean): void {
+    this.topologyEnabled = enabled;
+    if (enabled && !this.snappingEnabled) {
+      this.setSnapping(true);
+    }
+    this.container
+      ?.querySelector<HTMLElement>('[data-helper="topology"]')
+      ?.classList.toggle(
+        `${CSS_PREFIX}-tool-button--active`,
+        this.topologyEnabled,
+      );
   }
 
   private applySnappingState(): void {
@@ -4169,6 +4229,100 @@ export class GeoEditor implements IControl {
   // Geoman Integration
   // ============================================================================
 
+  /**
+   * Clip a new polygon to the uncovered area. This turns a roughly overlapping
+   * stand boundary into an exact shared boundary with the polygons already in
+   * the editor.
+   */
+  private applyTopologyToCreatedFeature(feature: Feature): Feature | null {
+    if (
+      !this.topologyEnabled ||
+      this.applyingTopology ||
+      !isPolygonFeature(feature)
+    ) {
+      return feature;
+    }
+
+    const featureId = this.getGeomanIdFromFeature(feature);
+    const existing = this.getFeatures().features.filter((candidate) => {
+      if (candidate === feature) return false;
+      const candidateId = this.getGeomanIdFromFeature(candidate);
+      if (featureId && candidateId === featureId) return false;
+      return (
+        JSON.stringify(candidate.geometry) !== JSON.stringify(feature.geometry)
+      );
+    });
+    const topological = removePolygonOverlaps(feature, existing);
+    const featureData = this.findGeomanDataForFeature(feature);
+
+    this.applyingTopology = true;
+    try {
+      if (!topological) {
+        featureData?.delete();
+        return null;
+      }
+      if (
+        JSON.stringify(topological.geometry) !==
+        JSON.stringify(feature.geometry)
+      ) {
+        if (featureData?.updateGeometry) {
+          featureData.updateGeometry(topological.geometry);
+        } else {
+          featureData?.updateGeoJsonGeometry?.(topological.geometry);
+        }
+      }
+      return topological;
+    } finally {
+      this.applyingTopology = false;
+    }
+  }
+
+  /**
+   * Move matching vertices in adjacent polygons after a shared node is edited.
+   */
+  private applyTopologyToEditedFeature(
+    oldFeature: Feature,
+    newFeature: Feature,
+  ): void {
+    if (
+      !this.topologyEnabled ||
+      this.applyingTopology ||
+      !isPolygonFeature(oldFeature) ||
+      !isPolygonFeature(newFeature)
+    ) {
+      return;
+    }
+
+    const editedId = this.getGeomanIdFromFeature(newFeature);
+    const targets = this.getFeatures().features.filter((candidate) => {
+      if (candidate === newFeature) return false;
+      const candidateId = this.getGeomanIdFromFeature(candidate);
+      return !(editedId && candidateId === editedId);
+    });
+    const changed = propagateSharedVertexMoves(
+      oldFeature,
+      newFeature,
+      targets,
+    );
+
+    this.applyingTopology = true;
+    try {
+      for (const updated of changed) {
+        const featureData = this.findGeomanDataForFeature(updated);
+        const original = this.getGeomanFeature(featureData);
+        if (!featureData || !original) continue;
+        if (featureData.updateGeometry) {
+          featureData.updateGeometry(updated.geometry);
+        } else {
+          featureData.updateGeoJsonGeometry?.(updated.geometry);
+        }
+        this.options.onFeatureEdit?.(updated, original);
+      }
+    } finally {
+      this.applyingTopology = false;
+    }
+  }
+
   private setupGeomanEvents(): void {
     if (!this.geoman) return;
 
@@ -4185,17 +4339,23 @@ export class GeoEditor implements IControl {
         (eventName === "gm:create" || event.type === "gm:create") &&
         eventFeature
       ) {
-        this.lastCreatedFeature = eventFeature;
-        this.options.onFeatureCreate?.(eventFeature);
-        this.logSelectedFeatureCollection("created", eventFeature);
+        const createdFeature = this.applyTopologyToCreatedFeature(eventFeature);
+        if (!createdFeature) return;
+        this.lastCreatedFeature = createdFeature;
+        this.options.onFeatureCreate?.(createdFeature);
+        this.logSelectedFeatureCollection("created", createdFeature);
         // Record create operation in history
-        this.recordCreateOperation(eventFeature);
+        this.recordCreateOperation(createdFeature);
 
         // Show attribute panel for newly created feature
         if (this.options.enableAttributeEditing) {
-          this.applyDefaultValues(eventFeature);
-          const geomanData = this.findGeomanDataForFeature(eventFeature);
-          this.showAttributePanel(eventFeature, geomanData ?? undefined, true);
+          this.applyDefaultValues(createdFeature);
+          const geomanData = this.findGeomanDataForFeature(createdFeature);
+          this.showAttributePanel(
+            createdFeature,
+            geomanData ?? undefined,
+            true,
+          );
         }
       }
 
@@ -4206,6 +4366,12 @@ export class GeoEditor implements IControl {
 
       // Handle feature edit end
       if (eventAction === "feature_edit_end" && eventFeature) {
+        if (this.pendingEditFeature) {
+          this.applyTopologyToEditedFeature(
+            this.pendingEditFeature,
+            eventFeature,
+          );
+        }
         this.lastEditedFeature = eventFeature;
         this.logSelectedFeatureCollection("edited", eventFeature);
         // Record edit operation in history

@@ -55,7 +55,11 @@ export const ADVANCED_EDIT_MODES: EditMode[] = [
 /**
  * Default helper modes
  */
-export const DEFAULT_HELPER_MODES: HelperMode[] = ['snapping', 'measurements'];
+export const DEFAULT_HELPER_MODES: HelperMode[] = [
+  'snapping',
+  'topology',
+  'measurements',
+];
 
 /**
  * Default file modes
@@ -76,6 +80,7 @@ export const DEFAULT_OPTIONS: GeoEditorOptionsRequired = {
   showLabels: false,
   simplifyTolerance: 0.001,
   snappingEnabled: true,
+  topologyEnabled: false,
   measurementsEnabled: false,
   hideGeomanControl: true,
   saveFilename: 'features.geojson',

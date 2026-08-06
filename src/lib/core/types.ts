@@ -49,7 +49,7 @@ export type EditMode =
   | "simplify"
   | "lasso";
 
-export type HelperMode = "snapping" | "measurements";
+export type HelperMode = "snapping" | "topology" | "measurements";
 
 export type FileMode = "open" | "save";
 
@@ -84,6 +84,8 @@ export interface GeoEditorOptions {
   simplifyTolerance?: number;
   /** Enable snapping by default */
   snappingEnabled?: boolean;
+  /** Reuse polygon boundaries and propagate edits across shared vertices */
+  topologyEnabled?: boolean;
   /** Enable measurements by default */
   measurementsEnabled?: boolean;
   /** Hide the geoman control (use GeoEditor toolbar instead) */
