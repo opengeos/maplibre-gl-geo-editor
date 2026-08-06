@@ -4283,14 +4283,14 @@ export class GeoEditor implements IControl {
   private applyTopologyToEditedFeature(
     oldFeature: Feature,
     newFeature: Feature,
-  ): void {
+  ): Array<{ oldFeature: Feature; newFeature: Feature }> {
     if (
       !this.topologyEnabled ||
       this.applyingTopology ||
       !isPolygonFeature(oldFeature) ||
       !isPolygonFeature(newFeature)
     ) {
-      return;
+      return [];
     }
 
     const editedId = this.getGeomanIdFromFeature(newFeature);
@@ -4306,6 +4306,7 @@ export class GeoEditor implements IControl {
     );
 
     this.applyingTopology = true;
+    const edits: Array<{ oldFeature: Feature; newFeature: Feature }> = [];
     try {
       for (const updated of changed) {
         const featureData = this.findGeomanDataForFeature(updated);
@@ -4317,10 +4318,12 @@ export class GeoEditor implements IControl {
           featureData.updateGeoJsonGeometry?.(updated.geometry);
         }
         this.options.onFeatureEdit?.(updated, original);
+        edits.push({ oldFeature: original, newFeature: updated });
       }
     } finally {
       this.applyingTopology = false;
     }
+    return edits;
   }
 
   private setupGeomanEvents(): void {
@@ -4366,8 +4369,12 @@ export class GeoEditor implements IControl {
 
       // Handle feature edit end
       if (eventAction === "feature_edit_end" && eventFeature) {
+        let topologyEdits: Array<{
+          oldFeature: Feature;
+          newFeature: Feature;
+        }> = [];
         if (this.pendingEditFeature) {
-          this.applyTopologyToEditedFeature(
+          topologyEdits = this.applyTopologyToEditedFeature(
             this.pendingEditFeature,
             eventFeature,
           );
@@ -4376,7 +4383,15 @@ export class GeoEditor implements IControl {
         this.logSelectedFeatureCollection("edited", eventFeature);
         // Record edit operation in history
         if (this.pendingEditFeature) {
-          this.recordEditOperation(this.pendingEditFeature, eventFeature);
+          if (topologyEdits.length > 0) {
+            this.recordTopologyEditOperation(
+              this.pendingEditFeature,
+              eventFeature,
+              topologyEdits,
+            );
+          } else {
+            this.recordEditOperation(this.pendingEditFeature, eventFeature);
+          }
           this.pendingEditFeature = null;
         }
       }
@@ -4520,6 +4535,45 @@ export class GeoEditor implements IControl {
 
     const command = new EditFeatureCommand(oldFeature, newFeature, context);
     this.historyManager.record(command);
+  }
+
+  /**
+   * Record the edited polygon and every adjacent polygon changed through a
+   * shared node as one undoable operation.
+   */
+  private recordTopologyEditOperation(
+    oldFeature: Feature,
+    newFeature: Feature,
+    propagatedEdits: Array<{
+      oldFeature: Feature;
+      newFeature: Feature;
+    }>,
+  ): void {
+    if (
+      !this.historyManager ||
+      this.historyManager.isExecutingCommand() ||
+      this.isPerformingCompositeOperation
+    ) {
+      return;
+    }
+
+    const context = this.getCommandContext();
+    if (!context) return;
+
+    const commands = [
+      new EditFeatureCommand(oldFeature, newFeature, context),
+      ...propagatedEdits.map(
+        (edit) =>
+          new EditFeatureCommand(
+            edit.oldFeature,
+            edit.newFeature,
+            context,
+          ),
+      ),
+    ];
+    this.historyManager.record(
+      new CompositeCommand(commands, "Edit shared polygon nodes"),
+    );
   }
 
   /**
