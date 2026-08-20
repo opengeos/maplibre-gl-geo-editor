@@ -1,12 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
-import { Geoman } from '@geoman-io/maplibre-geoman-free';
-import { GeoEditorReact } from '../../src/react';
-import type { GeomanInstance } from '../../src/lib/core/types';
+import React, { useEffect, useRef, useState } from "react";
+import maplibregl from "maplibre-gl";
+import { Geoman } from "@geoman-io/maplibre-geoman-free";
+import { GeoEditorReact } from "../../src/react";
+import type { GeomanInstance } from "../../src/lib/core/types";
 
-import 'maplibre-gl/dist/maplibre-gl.css';
-import '@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css';
-import '../../src/lib/styles/geo-editor.css';
+import "maplibre-gl/dist/maplibre-gl.css";
+import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css";
+import "../../src/lib/styles/geo-editor.css";
 
 function App() {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -26,17 +26,17 @@ function App() {
         version: 8,
         sources: {
           osm: {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
             tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors',
+            attribution: "&copy; OpenStreetMap contributors",
           },
         },
         layers: [
           {
-            id: 'osm',
-            type: 'raster',
-            source: 'osm',
+            id: "osm",
+            type: "raster",
+            source: "osm",
           },
         ],
       },
@@ -46,27 +46,27 @@ function App() {
 
     mapRef.current = newMap;
 
-    newMap.on('load', () => {
+    newMap.on("load", () => {
       // Initialize Geoman
       const gm = new Geoman(newMap, {});
 
-      newMap.on('gm:loaded', () => {
+      newMap.on("gm:loaded", () => {
         setMap(newMap);
         setGeoman(gm as unknown as GeomanInstance);
 
         // Add sample features with properties
         gm.features.importGeoJsonFeature({
-          type: 'Feature',
-          id: 'sample-1',
+          type: "Feature",
+          id: "sample-1",
           properties: {
-            name: 'Downtown District',
-            land_use: 'commercial',
-            description: 'Main commercial area with shops',
-            notes: 'High traffic zone',
-            color: '#ff6b6b',
+            name: "Downtown District",
+            land_use: "commercial",
+            description: "Main commercial area with shops",
+            notes: "High traffic zone",
+            color: "#ff6b6b",
           },
           geometry: {
-            type: 'Polygon',
+            type: "Polygon",
             coordinates: [
               [
                 [-122.43, 37.79],
@@ -80,22 +80,22 @@ function App() {
         });
 
         gm.features.importGeoJsonFeature({
-          type: 'Feature',
-          id: 'sample-2',
+          type: "Feature",
+          id: "sample-2",
           properties: {
-            name: 'Residential Area',
-            land_use: 'residential',
-            description: 'Quiet neighborhood',
-            color: '#4ecdc4',
+            name: "Residential Area",
+            land_use: "residential",
+            description: "Quiet neighborhood",
+            color: "#4ecdc4",
           },
           geometry: {
-            type: 'Polygon',
+            type: "Polygon",
             coordinates: [
               [
                 [-122.42, 37.78],
                 [-122.42, 37.76],
-                [-122.40, 37.76],
-                [-122.40, 37.78],
+                [-122.4, 37.76],
+                [-122.4, 37.78],
                 [-122.42, 37.78],
               ],
             ],
@@ -134,8 +134,8 @@ function App() {
   };
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
 
       {map && geoman && (
         <GeoEditorReact
@@ -152,78 +152,97 @@ function App() {
           // Define attribute schema
           attributeSchema={{
             polygon: [
-              { name: 'name', label: 'Name', type: 'string', required: true },
               {
-                name: 'land_use',
-                label: 'Land Use',
-                type: 'select',
-                options: [
-                  { value: 'residential', label: 'Residential' },
-                  { value: 'commercial', label: 'Commercial' },
-                  { value: 'industrial', label: 'Industrial' },
-                  { value: 'park', label: 'Park' },
-                ],
-                defaultValue: 'residential',
+                name: "height",
+                label: "Height (m)",
+                type: "number",
+                min: 0,
+                step: 0.5,
+                defaultValue: 10,
               },
-              { name: 'description', label: 'Description', type: 'textarea' },
+              { name: "name", label: "Name", type: "string", required: true },
+              {
+                name: "land_use",
+                label: "Land Use",
+                type: "select",
+                options: [
+                  { value: "residential", label: "Residential" },
+                  { value: "commercial", label: "Commercial" },
+                  { value: "industrial", label: "Industrial" },
+                  { value: "park", label: "Park" },
+                ],
+                defaultValue: "residential",
+              },
+              { name: "description", label: "Description", type: "textarea" },
             ],
             line: [
-              { name: 'name', label: 'Name', type: 'string', required: true },
-              { name: 'road_type', label: 'Road Type', type: 'string' },
-              { name: 'lanes', label: 'Lanes', type: 'number', min: 1, max: 8 },
+              { name: "name", label: "Name", type: "string", required: true },
+              { name: "road_type", label: "Road Type", type: "string" },
+              { name: "lanes", label: "Lanes", type: "number", min: 1, max: 8 },
             ],
             point: [
-              { name: 'name', label: 'Name', type: 'string', required: true },
-              { name: 'category', label: 'Category', type: 'string' },
-              { name: 'active', label: 'Active', type: 'boolean', defaultValue: true },
+              { name: "name", label: "Name", type: "string", required: true },
+              { name: "category", label: "Category", type: "string" },
+              {
+                name: "active",
+                label: "Active",
+                type: "boolean",
+                defaultValue: true,
+              },
             ],
             common: [
-              { name: 'notes', label: 'Notes', type: 'textarea' },
-              { name: 'color', label: 'Color', type: 'color', defaultValue: '#3388ff' },
+              { name: "notes", label: "Notes", type: "textarea" },
+              {
+                name: "color",
+                label: "Color",
+                type: "color",
+                defaultValue: "#3388ff",
+              },
             ],
           }}
           drawModes={[
-            'polygon',
-            'line',
-            'rectangle',
-            'circle',
-            'marker',
-            'circle_marker',
-            'text_marker',
-            'ellipse',
-            'freehand',
+            "polygon",
+            "massing",
+            "line",
+            "rectangle",
+            "circle",
+            "marker",
+            "circle_marker",
+            "text_marker",
+            "ellipse",
+            "freehand",
           ]}
           editModes={[
-            'select',
-            'drag',
-            'change',
-            'rotate',
-            'cut',
-            'delete',
-            'scale',
-            'copy',
-            'split',
-            'union',
-            'difference',
-            'simplify',
-            'lasso',
+            "select",
+            "drag",
+            "change",
+            "rotate",
+            "cut",
+            "delete",
+            "scale",
+            "copy",
+            "split",
+            "union",
+            "difference",
+            "simplify",
+            "lasso",
           ]}
-          fileModes={['open', 'save']}
+          fileModes={["open", "save"]}
           saveFilename="my-features.geojson"
           onFeatureCreate={handleFeatureCreate}
           onFeatureDelete={handleFeatureDelete}
           onSelectionChange={handleSelectionChange}
           onAttributeChange={(event) => {
-            console.log('Attribute changed:', event);
+            console.log("Attribute changed:", event);
           }}
           onGeoJsonLoad={(result) => {
-            console.log('Loaded:', result);
+            console.log("Loaded:", result);
             if (geoman) {
               updateFeatureCount(geoman as unknown as Geoman);
             }
           }}
           onGeoJsonSave={(result) => {
-            console.log('Saved:', result);
+            console.log("Saved:", result);
           }}
         />
       )}
@@ -231,13 +250,13 @@ function App() {
       {/* Info Panel */}
       <div
         style={{
-          position: 'absolute',
+          position: "absolute",
           top: 10,
           right: 10,
-          background: 'white',
+          background: "white",
           padding: 16,
           borderRadius: 8,
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+          boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
           maxWidth: 280,
           zIndex: 1000,
         }}
@@ -245,15 +264,15 @@ function App() {
         <h3 style={{ marginBottom: 12, fontSize: 14 }}>GeoEditor React Demo</h3>
 
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: '#666' }}>
+          <div style={{ fontSize: 12, color: "#666" }}>
             Features: <strong>{featureCount}</strong>
           </div>
-          <div style={{ fontSize: 12, color: '#666' }}>
+          <div style={{ fontSize: 12, color: "#666" }}>
             Selected: <strong>{selectedCount}</strong>
           </div>
         </div>
 
-        <div style={{ fontSize: 11, color: '#888' }}>
+        <div style={{ fontSize: 11, color: "#888" }}>
           <p style={{ marginBottom: 8 }}>
             <strong>Draw:</strong> Click tools to draw shapes
           </p>

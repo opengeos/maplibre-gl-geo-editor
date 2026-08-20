@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -32,8 +32,9 @@
         box-sizing: border-box;
       }
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-          'Helvetica Neue', Arial, sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
       }
       #map {
         width: 100vw;
@@ -66,7 +67,7 @@
         position: relative;
       }
       .info-panel li::before {
-        content: '•';
+        content: "•";
         position: absolute;
         left: 0;
         color: #3388ff;
@@ -123,28 +124,28 @@
 
     <script type="module">
       // Import GeoEditor from CDN (pinned version)
-      import { GeoEditor } from 'https://unpkg.com/maplibre-gl-geo-editor@0.1.0/dist/index.mjs';
+      import { GeoEditor } from "https://unpkg.com/maplibre-gl-geo-editor@0.1.0/dist/index.mjs";
 
-      console.log('GeoEditor imported:', GeoEditor);
+      console.log("GeoEditor imported:", GeoEditor);
 
       // Create the map (maplibregl is available globally)
       const map = new maplibregl.Map({
-        container: 'map',
+        container: "map",
         style: {
           version: 8,
           sources: {
             osm: {
-              type: 'raster',
-              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              type: "raster",
+              tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
               tileSize: 256,
-              attribution: '&copy; OpenStreetMap contributors',
+              attribution: "&copy; OpenStreetMap contributors",
             },
           },
           layers: [
             {
-              id: 'osm',
-              type: 'raster',
-              source: 'osm',
+              id: "osm",
+              type: "raster",
+              source: "osm",
             },
           ],
         },
@@ -153,142 +154,167 @@
       });
 
       // Wait for map to load
-      map.on('load', () => {
-        console.log('Map loaded');
-        console.log('Geoman global:', typeof Geoman, Geoman);
+      map.on("load", () => {
+        console.log("Map loaded");
+        console.log("Geoman global:", typeof Geoman, Geoman);
 
         // Initialize Geoman (available globally as Geoman.Geoman)
         const geoman = new Geoman.Geoman(map, {});
-        console.log('Geoman instance created:', geoman);
+        console.log("Geoman instance created:", geoman);
 
         // Wait for Geoman to load
-        map.on('gm:loaded', () => {
-          console.log('Geoman loaded event fired');
+        map.on("gm:loaded", () => {
+          console.log("Geoman loaded event fired");
 
           // Create GeoEditor control with all tools
           const geoEditor = new GeoEditor({
-            position: 'top-left',
+            position: "top-left",
             collapsed: false,
-            toolbarOrientation: 'vertical',
+            toolbarOrientation: "vertical",
             showLabels: false,
             // Enable attribute editing panel
             enableAttributeEditing: true,
-            attributePanelPosition: 'right',
+            attributePanelPosition: "right",
             attributePanelWidth: 300,
-            attributePanelTitle: 'Feature Properties',
+            attributePanelTitle: "Feature Properties",
             // Define attribute schema for different geometry types
             attributeSchema: {
               polygon: [
-                { name: 'name', label: 'Name', type: 'string', required: true },
                 {
-                  name: 'land_use',
-                  label: 'Land Use',
-                  type: 'select',
-                  options: [
-                    { value: 'residential', label: 'Residential' },
-                    { value: 'commercial', label: 'Commercial' },
-                    { value: 'industrial', label: 'Industrial' },
-                    { value: 'park', label: 'Park' },
-                  ],
-                  defaultValue: 'residential',
+                  name: "height",
+                  label: "Height (m)",
+                  type: "number",
+                  min: 0,
+                  step: 0.5,
+                  defaultValue: 10,
                 },
-                { name: 'description', label: 'Description', type: 'textarea' },
+                { name: "name", label: "Name", type: "string", required: true },
+                {
+                  name: "land_use",
+                  label: "Land Use",
+                  type: "select",
+                  options: [
+                    { value: "residential", label: "Residential" },
+                    { value: "commercial", label: "Commercial" },
+                    { value: "industrial", label: "Industrial" },
+                    { value: "park", label: "Park" },
+                  ],
+                  defaultValue: "residential",
+                },
+                { name: "description", label: "Description", type: "textarea" },
               ],
               line: [
-                { name: 'name', label: 'Name', type: 'string', required: true },
-                { name: 'road_type', label: 'Road Type', type: 'string' },
-                { name: 'lanes', label: 'Lanes', type: 'number', min: 1, max: 8 },
+                { name: "name", label: "Name", type: "string", required: true },
+                { name: "road_type", label: "Road Type", type: "string" },
+                {
+                  name: "lanes",
+                  label: "Lanes",
+                  type: "number",
+                  min: 1,
+                  max: 8,
+                },
               ],
               point: [
-                { name: 'name', label: 'Name', type: 'string', required: true },
-                { name: 'category', label: 'Category', type: 'string' },
-                { name: 'active', label: 'Active', type: 'boolean', defaultValue: true },
+                { name: "name", label: "Name", type: "string", required: true },
+                { name: "category", label: "Category", type: "string" },
+                {
+                  name: "active",
+                  label: "Active",
+                  type: "boolean",
+                  defaultValue: true,
+                },
               ],
               common: [
-                { name: 'notes', label: 'Notes', type: 'textarea' },
-                { name: 'color', label: 'Color', type: 'color', defaultValue: '#3388ff' },
+                { name: "notes", label: "Notes", type: "textarea" },
+                {
+                  name: "color",
+                  label: "Color",
+                  type: "color",
+                  defaultValue: "#3388ff",
+                },
               ],
             },
             // All draw modes
             drawModes: [
-              'polygon',
-              'line',
-              'rectangle',
-              'circle',
-              'marker',
-              'circle_marker',
-              'text_marker',
-              'ellipse',
-              'freehand',
+              "polygon",
+              "massing",
+              "line",
+              "rectangle",
+              "circle",
+              "marker",
+              "circle_marker",
+              "text_marker",
+              "ellipse",
+              "freehand",
             ],
             // All edit modes
             editModes: [
-              'select',
-              'drag',
-              'change',
-              'rotate',
-              'cut',
-              'delete',
-              'scale',
-              'copy',
-              'split',
-              'union',
-              'difference',
-              'simplify',
-              'lasso',
+              "select",
+              "drag",
+              "change",
+              "rotate",
+              "cut",
+              "delete",
+              "scale",
+              "copy",
+              "split",
+              "union",
+              "difference",
+              "simplify",
+              "lasso",
             ],
             // File modes
-            fileModes: ['open', 'save'],
-            saveFilename: 'my-features.geojson',
+            fileModes: ["open", "save"],
+            saveFilename: "my-features.geojson",
             onFeatureCreate: (feature) => {
-              console.log('Feature created:', feature);
+              console.log("Feature created:", feature);
             },
             onFeatureEdit: (feature, oldFeature) => {
-              console.log('Feature edited:', feature);
+              console.log("Feature edited:", feature);
             },
             onFeatureDelete: (featureId) => {
-              console.log('Feature deleted:', featureId);
+              console.log("Feature deleted:", featureId);
             },
             onSelectionChange: (features) => {
-              console.log('Selection changed:', features.length, 'features');
+              console.log("Selection changed:", features.length, "features");
             },
             onModeChange: (mode) => {
-              console.log('Mode changed:', mode);
+              console.log("Mode changed:", mode);
             },
             onGeoJsonLoad: (result) => {
-              console.log('GeoJSON loaded:', result);
+              console.log("GeoJSON loaded:", result);
             },
             onGeoJsonSave: (result) => {
-              console.log('GeoJSON saved:', result);
+              console.log("GeoJSON saved:", result);
             },
             onAttributeChange: (event) => {
-              console.log('Attribute changed:', event);
+              console.log("Attribute changed:", event);
             },
           });
 
-          console.log('GeoEditor instance created:', geoEditor);
+          console.log("GeoEditor instance created:", geoEditor);
 
           // Connect GeoEditor with Geoman
           geoEditor.setGeoman(geoman);
-          console.log('Geoman connected to GeoEditor');
+          console.log("Geoman connected to GeoEditor");
 
           // Add the control to the map
-          map.addControl(geoEditor, 'top-left');
-          console.log('GeoEditor control added to map');
+          map.addControl(geoEditor, "top-left");
+          console.log("GeoEditor control added to map");
 
           // Add sample features with properties
           geoman.features.importGeoJsonFeature({
-            type: 'Feature',
-            id: 'sample-polygon',
+            type: "Feature",
+            id: "sample-polygon",
             properties: {
-              name: 'Downtown District',
-              land_use: 'commercial',
-              description: 'Main commercial area',
-              notes: 'High traffic zone',
-              color: '#ff6b6b',
+              name: "Downtown District",
+              land_use: "commercial",
+              description: "Main commercial area",
+              notes: "High traffic zone",
+              color: "#ff6b6b",
             },
             geometry: {
-              type: 'Polygon',
+              type: "Polygon",
               coordinates: [
                 [
                   [-122.43, 37.79],
@@ -302,16 +328,16 @@
           });
 
           geoman.features.importGeoJsonFeature({
-            type: 'Feature',
-            id: 'sample-polygon-2',
+            type: "Feature",
+            id: "sample-polygon-2",
             properties: {
-              name: 'Residential Area',
-              land_use: 'residential',
-              description: 'Quiet neighborhood',
-              color: '#4ecdc4',
+              name: "Residential Area",
+              land_use: "residential",
+              description: "Quiet neighborhood",
+              color: "#4ecdc4",
             },
             geometry: {
-              type: 'Polygon',
+              type: "Polygon",
               coordinates: [
                 [
                   [-122.42, 37.78],
@@ -324,13 +350,13 @@
             },
           });
 
-          console.log('GeoEditor initialized via CDN');
+          console.log("GeoEditor initialized via CDN");
         });
       });
 
       // Handle errors
-      map.on('error', (e) => {
-        console.error('Map error:', e);
+      map.on("error", (e) => {
+        console.error("Map error:", e);
       });
     </script>
   </body>
