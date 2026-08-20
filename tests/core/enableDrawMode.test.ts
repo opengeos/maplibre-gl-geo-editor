@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { GeoEditor } from "../../src/lib/core/GeoEditor";
 import type { DrawMode } from "../../src/lib/core/types";
 
@@ -106,5 +106,63 @@ describe("enableDrawMode draw-tool-switch sequencing (#889)", () => {
     teardowns[0]();
     await flush();
     expect(freehandCalls).toEqual([1]);
+  });
+
+  it("uses Geoman's polygon tool for building massing", async () => {
+    const { editor, enableDrawCalls, teardowns } = makeEditor();
+
+    editor.enableDrawMode("massing");
+    teardowns[0]();
+    await flush();
+
+    expect(enableDrawCalls).toEqual(["polygon"]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((editor as any).state.activeDrawMode).toBe("massing");
+  });
+});
+
+describe("massing feature creation", () => {
+  it("commits the configured height through Geoman before creation callback", () => {
+    const onFeatureCreate = vi.fn();
+    const updateProperties = vi.fn();
+    const editor = new GeoEditor({
+      massingHeightProperty: "building_height",
+      massingDefaultHeight: 18,
+      onFeatureCreate,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anyEditor = editor as any;
+    let listener: ((event: unknown) => void) | undefined;
+    anyEditor.geoman = {
+      setGlobalEventsListener: (callback: (event: unknown) => void) => {
+        listener = callback;
+      },
+    };
+    anyEditor.state.activeDrawMode = "massing";
+    anyEditor.findGeomanDataForFeature = () => ({ updateProperties });
+    anyEditor.recordCreateOperation = () => {};
+    anyEditor.setupGeomanEvents();
+
+    const feature = {
+      type: "Feature" as const,
+      properties: {},
+      geometry: {
+        type: "Polygon" as const,
+        coordinates: [
+          [
+            [0, 0],
+            [1, 0],
+            [1, 1],
+            [0, 0],
+          ],
+        ],
+      },
+    };
+    listener?.({ type: "gm:create", feature });
+
+    expect(updateProperties).toHaveBeenCalledWith({ building_height: 18 });
+    expect(onFeatureCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ properties: { building_height: 18 } }),
+    );
   });
 });
