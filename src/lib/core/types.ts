@@ -418,6 +418,7 @@ export interface GeomanFeatureData {
   shape: string;
   geoJson?: Feature;
   getGeoJson?: () => Feature;
+  updateProperties?: (properties: Record<string, unknown>) => void;
   updateGeometry?: (geometry: Geometry) => void;
   updateGeoJsonGeometry?: (geometry: Geometry) => void;
   temporary?: boolean;

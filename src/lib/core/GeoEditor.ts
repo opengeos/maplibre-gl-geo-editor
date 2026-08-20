@@ -1595,6 +1595,7 @@ export class GeoEditor implements IControl {
     const handler = (e: MapMouseEvent): void => {
       if (
         this.state.activeDrawMode !== "polygon" &&
+        this.state.activeDrawMode !== "massing" &&
         this.state.activeDrawMode !== "line"
       ) {
         return;
@@ -1639,7 +1640,10 @@ export class GeoEditor implements IControl {
    * @returns true when a shape was finished, false otherwise.
    */
   private finishActiveLineOrPolygonDraw(): boolean {
-    const mode = this.state.activeDrawMode;
+    const mode =
+      this.state.activeDrawMode === "massing"
+        ? "polygon"
+        : this.state.activeDrawMode;
     if (mode !== "polygon" && mode !== "line") return false;
     if (!this.geoman) return false;
 
@@ -2714,6 +2718,10 @@ export class GeoEditor implements IControl {
     geomanData: GeomanFeatureData,
     properties: GeoJsonProperties,
   ): void {
+    if (geomanData.updateProperties) {
+      geomanData.updateProperties(properties ?? {});
+      return;
+    }
     // Get the current GeoJSON from Geoman
     const geoJson = geomanData.getGeoJson
       ? geomanData.getGeoJson()
