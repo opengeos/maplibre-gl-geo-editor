@@ -1358,7 +1358,7 @@ export class GeoEditor implements IControl {
       if (mode === "freehand") {
         this.enableFreehandMode();
       } else if (this.geoman) {
-        this.geoman.enableDraw(mode);
+        this.geoman.enableDraw(mode === "massing" ? "polygon" : mode);
         // Apply semi-transparent vertex marker styles after a short delay
         // to allow Geoman to create its drawing layers
         setTimeout(() => this.applyVertexMarkerStyles(), 50);
@@ -4078,6 +4078,7 @@ export class GeoEditor implements IControl {
       line: "Line",
       rectangle: "Rectangle",
       polygon: "Polygon",
+      massing: "Building massing",
       freehand: "Freehand",
       // Edit modes
       select: "Select (click features)",
@@ -4105,6 +4106,8 @@ export class GeoEditor implements IControl {
     const icons: Record<string, string> = {
       polygon:
         '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="12,2 22,8 18,22 6,22 2,8" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+      massing:
+        '<svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 8l8-4 8 4-8 4-8-4zm0 0v8l8 4 8-4V8M12 12v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
       line: '<svg viewBox="0 0 24 24" width="18" height="18"><line x1="4" y1="20" x2="20" y2="4" stroke="currentColor" stroke-width="2"/></svg>',
       rectangle:
         '<svg viewBox="0 0 24 24" width="18" height="18"><rect x="3" y="5" width="18" height="14" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
@@ -4299,11 +4302,7 @@ export class GeoEditor implements IControl {
       const candidateId = this.getGeomanIdFromFeature(candidate);
       return !(editedId && candidateId === editedId);
     });
-    const changed = propagateSharedVertexMoves(
-      oldFeature,
-      newFeature,
-      targets,
-    );
+    const changed = propagateSharedVertexMoves(oldFeature, newFeature, targets);
 
     this.applyingTopology = true;
     const edits: Array<{ oldFeature: Feature; newFeature: Feature }> = [];
@@ -4342,6 +4341,21 @@ export class GeoEditor implements IControl {
         (eventName === "gm:create" || event.type === "gm:create") &&
         eventFeature
       ) {
+        if (
+          this.state.activeDrawMode === "massing" &&
+          (eventFeature.geometry.type === "Polygon" ||
+            eventFeature.geometry.type === "MultiPolygon")
+        ) {
+          eventFeature.properties = {
+            ...eventFeature.properties,
+            [this.options.massingHeightProperty]:
+              this.options.massingDefaultHeight,
+          };
+          const geomanData = this.findGeomanDataForFeature(eventFeature);
+          if (geomanData) {
+            this.updateFeatureProperties(geomanData, eventFeature.properties);
+          }
+        }
         const createdFeature = this.applyTopologyToCreatedFeature(eventFeature);
         if (!createdFeature) return;
         this.lastCreatedFeature = createdFeature;
@@ -4564,11 +4578,7 @@ export class GeoEditor implements IControl {
       new EditFeatureCommand(oldFeature, newFeature, context),
       ...propagatedEdits.map(
         (edit) =>
-          new EditFeatureCommand(
-            edit.oldFeature,
-            edit.newFeature,
-            context,
-          ),
+          new EditFeatureCommand(edit.oldFeature, edit.newFeature, context),
       ),
     ];
     this.historyManager.record(

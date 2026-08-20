@@ -107,4 +107,16 @@ describe("enableDrawMode draw-tool-switch sequencing (#889)", () => {
     await flush();
     expect(freehandCalls).toEqual([1]);
   });
+
+  it("uses Geoman's polygon tool for building massing", async () => {
+    const { editor, enableDrawCalls, teardowns } = makeEditor();
+
+    editor.enableDrawMode("massing");
+    teardowns[0]();
+    await flush();
+
+    expect(enableDrawCalls).toEqual(["polygon"]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((editor as any).state.activeDrawMode).toBe("massing");
+  });
 });

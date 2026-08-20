@@ -31,6 +31,7 @@ export type DrawMode =
   | "line"
   | "rectangle"
   | "polygon"
+  | "massing"
   | "freehand"; // Custom implementation
 
 export type EditMode =
@@ -90,6 +91,10 @@ export interface GeoEditorOptions {
   measurementsEnabled?: boolean;
   /** Hide the geoman control (use GeoEditor toolbar instead) */
   hideGeomanControl?: boolean;
+  /** Property written by the massing draw mode (default: 'height') */
+  massingHeightProperty?: string;
+  /** Initial height written by the massing draw mode (default: 10) */
+  massingDefaultHeight?: number;
   /** Callback when a feature is created */
   onFeatureCreate?: (feature: Feature) => void;
   /** Callback when a feature is edited */
