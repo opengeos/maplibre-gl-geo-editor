@@ -85,6 +85,12 @@ export interface GeoEditorOptions {
   simplifyTolerance?: number;
   /** Enable snapping by default */
   snappingEnabled?: boolean;
+  /** Expose Geoman's selected snap target (opt-in, tested with Geoman Free 0.9.1). */
+  snapEventsEnabled?: boolean;
+  /** Called for each resolved snap preview; this does not mean a vertex was committed. */
+  onSnap?: (event: SnapEvent) => void;
+  /** Called when the active snap is lost or its target changes. */
+  onUnsnap?: (event: SnapEvent) => void;
   /** Reuse polygon boundaries and propagate edits across shared vertices */
   topologyEnabled?: boolean;
   /** Enable measurements by default */
@@ -347,7 +353,26 @@ export interface ScaleHandle {
 // Event Types
 // ============================================================================
 
+/** Paths address the target GeoJSON Feature, e.g. ['geometry', 'coordinates', 2]. */
+export type SnapTarget =
+  | { kind: "custom" }
+  | ({ featureId: string | number; feature: Feature; temporary: boolean } & (
+      | { kind: "vertex"; coordinatePath: Array<string | number> }
+      | {
+          kind: "segment";
+          segmentPaths: [Array<string | number>, Array<string | number>];
+        }
+    ));
+
+export interface SnapEvent {
+  coordinate: [number, number];
+  pointerCoordinate: [number, number];
+  target: SnapTarget;
+}
+
 export interface GeoEditorEventMap {
+  "gm:snap": SnapEvent;
+  "gm:unsnap": SnapEvent;
   "gm:scale": { feature: Feature; scaleFactor: number };
   "gm:scalestart": { feature: Feature };
   "gm:scaleend": { feature: Feature; scaleFactor: number };

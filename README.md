@@ -60,8 +60,153 @@ A powerful MapLibre GL plugin for creating and editing geometries. Extends the f
 ## Installation
 
 ```bash
-npm install maplibre-gl-geo-editor @geoman-io/maplibre-geoman-free maplibre-gl
+npm install maplibre-gl-geo-editor @geoman-io/maplibre-geoman-free@^0.9.1 maplibre-gl@^6
 ```
+
+Requires Geoman Free 0.9.1 (0.9.x) and MapLibre GL JS 6.x. Both dependencies
+use ESM; MapLibre 6 requires named or namespace imports rather than a default import.
+
+With Vite, configure the worker before creating any maps:
+
+```typescript
+import { setWorkerUrl } from 'maplibre-gl';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+setWorkerUrl(workerUrl);
+```
+
+The `?worker&url` query bundles the worker's dependencies for production too.
+Other bundlers require their own worker setup; see the
+[MapLibre installation guide](https://maplibre.org/maplibre-gl-js/docs/#installation).
+
+
+## Snap target events
+
+Enable local snap observation to identify the feature and vertex or segment
+selected by Geoman. No Geoman fork or upstream patch is required.
+
+```typescript
+const editor = new GeoEditor({
+  snapEventsEnabled: true,
+  onSnap: ({ coordinate, target }) => {
+    if (target.kind === 'custom') return; // No feature identity for custom coordinates
+    console.log(target.featureId, target.feature.properties, coordinate);
+    if (target.kind === 'vertex') {
+      console.log(target.coordinatePath); // e.g. ['geometry', 'coordinates', 2]
+    } else {
+      console.log(target.segmentPaths); // Paths to both segment endpoints
+    }
+  },
+  onUnsnap: () => console.log('Snap target cleared'),
+});
+```
+
+The same payloads are emitted as `CustomEvent.detail` on `map.getContainer()`
+under `gm:snap` and `gm:unsnap`, following this editor's existing event convention.
+These are not MapLibre `map.on()` events. `onSnap` fires for each resolved snap
+calculation; `onUnsnap` fires when the target changes or is cleared.
+`editor.getSnapTarget()` returns a copy of the latest preview or `null`.
+`editor.isSnapTrackingAvailable()` reports whether an active compatible snapping
+helper is being observed; it is false while the helper is disabled or unavailable.
+
+Targets contain a snapshot of the target GeoJSON and its properties. `featureId`
+is Geoman's ID, not automatically an OSM ID; use your application's identity
+mapping. Paths address the snapshot Feature, including polygon ring and multipart
+indices. Coincident features follow Geoman's actual selection order. Custom snaps
+have no feature metadata, and temporary feature targets are marked `temporary`.
+
+**These are preview events, not vertex-commit events.** Applications must associate
+previews with their draw/edit transactions and verify the committed vertex before
+changing node references. This feature does not merge nodes, preserve an OSM graph,
+or generate changesets. Keep NWR IDs, versions, and relations in application state.
+
+The observer wraps methods on the active helper instance and restores them when
+Geoman is replaced or the editor is removed. Its internal integration and segment
+selection assumptions are tested against Geoman Free 0.9.1. Run the snap tests
+when upgrading Geoman; unsupported helper shapes leave tracking unavailable.
+
+### Getting the identity of a snapped node
+
+Use the selected feature **and its vertex path** to look up the node identity.
+`target.featureId` identifies the Geoman feature (for example, a way), while
+`target.coordinatePath` identifies the vertex within that feature. Equal
+coordinates alone do not establish that two vertices are the same OSM node.
+
+Store the original node IDs and versions alongside your geometry when loading
+data. For example, a three-vertex LineString can carry these application-defined
+properties, ordered exactly like its `geometry.coordinates`:
+
+```typescript
+const properties = {
+  osm_id: 'way/201',
+  osm_version: 7,
+  node_ids: ['node/101', 'node/102', 'node/103'],
+  node_versions: [2, 5, 1],
+};
+```
+
+Then resolve vertex snaps in the editor callback:
+
+```typescript
+import { GeoEditor } from 'maplibre-gl-geo-editor';
+
+const editor = new GeoEditor({
+  snapEventsEnabled: true,
+  onSnap: ({ target }) => {
+    if (target.kind !== 'vertex') return;
+    const feature = target.feature;
+    if (feature.geometry.type !== 'LineString') return;
+
+    // LineString path: ['geometry', 'coordinates', vertexIndex]
+    const vertexIndex = target.coordinatePath[2];
+    const { node_ids, node_versions } = feature.properties ?? {};
+    if (typeof vertexIndex !== 'number' || !Array.isArray(node_ids)) return;
+    if (node_ids.length !== feature.geometry.coordinates.length) return;
+
+    console.log({
+      featureId: target.featureId,
+      nodeId: node_ids[vertexIndex],
+      nodeVersion: Array.isArray(node_versions) && node_versions.length === node_ids.length
+        ? node_versions[vertexIndex]
+        : undefined,
+    });
+  },
+});
+
+// Connect to your existing Geoman instance and map.
+editor.setGeoman(geoman);
+map.addControl(editor, 'top-left');
+```
+
+The `node_ids` and `node_versions` fields above are your application's metadata;
+Geoman does not fetch or populate them. A way's version is separate from each
+referenced node's version. You can instead keep this information in an external
+store keyed by the editor feature ID and vertex path.
+
+For other geometries, include every part and ring index when resolving a path:
+
+| Target geometry | Vertex path | Suggested node-ID lookup |
+| --- | --- | --- |
+| LineString | `['geometry', 'coordinates', vertex]` | `node_ids[vertex]` |
+| MultiLineString | `['geometry', 'coordinates', part, vertex]` | `node_ids[part][vertex]` |
+| Polygon | `['geometry', 'coordinates', ring, vertex]` | `node_ids[ring][vertex]` |
+| MultiPolygon | `['geometry', 'coordinates', polygon, ring, vertex]` | `node_ids[polygon][ring][vertex]` |
+
+For polygons, ring `0` is the exterior and later rings are holes. Mirror that
+structure in your metadata; the closing coordinate must reference the same node
+ID as the first coordinate. For a segment snap, resolve both paths in
+`target.segmentPaths` to identify its endpoint nodes. A snap to the segment's
+interior does not identify an existing node at the snapped position.
+
+Keep these mappings synchronized with edits: moving a vertex retains its ID,
+inserting a vertex adds a new local ID, and deleting a vertex removes its
+reference. Do not simply renumber existing nodes after an insertion. Connecting
+or merging nodes requires an explicit application-level topology operation when
+the edit is committed, rather than updating references on every snap preview.
+
+Try the [Snap Target Inspector](examples/snapping/index.html) on the examples
+page. It displays node IDs, way versions, segment
+endpoints, and the event payload. Its LineString demo preserves existing IDs
+during vertex edits and assigns inserted vertices IDs such as `local/node-1`.
 
 ## Usage
 
@@ -72,7 +217,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import '@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css';
 import 'maplibre-gl-geo-editor/style.css';
 
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import { Geoman } from '@geoman-io/maplibre-geoman-free';
 import { GeoEditor } from 'maplibre-gl-geo-editor';
 
@@ -208,7 +353,7 @@ const schema = geoEditor.getAttributeSchema();
 
 ```tsx
 import { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import { Geoman } from '@geoman-io/maplibre-geoman-free';
 import { GeoEditorReact } from 'maplibre-gl-geo-editor/react';
 

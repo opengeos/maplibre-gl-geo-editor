@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { Geoman } from "@geoman-io/maplibre-geoman-free";
 import { GeoEditorReact } from "../../src/react";
 import type { GeomanInstance } from "../../src/lib/core/types";
@@ -7,6 +8,9 @@ import type { GeomanInstance } from "../../src/lib/core/types";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css";
 import "../../src/lib/styles/geo-editor.css";
+
+// MapLibre 6 needs an explicit bundled worker URL in Vite.
+maplibregl.setWorkerUrl(workerUrl);
 
 function App() {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -50,12 +54,9 @@ function App() {
       // Initialize Geoman
       const gm = new Geoman(newMap, {});
 
-      newMap.on("gm:loaded", () => {
-        setMap(newMap);
-        setGeoman(gm as unknown as GeomanInstance);
-
+      newMap.on("gm:loaded", async () => {
         // Add sample features with properties
-        gm.features.importGeoJsonFeature({
+        await gm.features.importGeoJsonFeature({
           type: "Feature",
           id: "sample-1",
           properties: {
@@ -79,7 +80,7 @@ function App() {
           },
         });
 
-        gm.features.importGeoJsonFeature({
+        await gm.features.importGeoJsonFeature({
           type: "Feature",
           id: "sample-2",
           properties: {
@@ -103,6 +104,8 @@ function App() {
         });
 
         updateFeatureCount(gm);
+        setMap(newMap);
+        setGeoman(gm as unknown as GeomanInstance);
       });
     });
 
@@ -113,7 +116,7 @@ function App() {
   }, []);
 
   const updateFeatureCount = (gm: Geoman) => {
-    const features = gm.features.getFeatures();
+    const features = gm.features.exportGeoJson();
     setFeatureCount(features.features.length);
   };
 

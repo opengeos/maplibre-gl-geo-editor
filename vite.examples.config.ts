@@ -15,6 +15,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         basic: resolve(__dirname, 'examples/basic/index.html'),
         react: resolve(__dirname, 'examples/react/index.html'),
+        snapping: resolve(__dirname, 'examples/snapping/index.html'),
       },
     },
   },

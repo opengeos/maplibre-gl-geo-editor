@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>Snap Targets — GeoEditor</title>
+  </head>
+  <body>
+    <main class="demo">
+      <section class="map-panel" aria-label="Drawing playground">
+        <div id="map"></div>
+        <div class="map-hint">
+          Choose Draw line, then move near a blue node or line.
+        </div>
+        <div class="map-caption">Sample geometry · no live OSM data</div>
+      </section>
+      <aside class="inspector">
+        <a class="back-link" href="../../index.html">← All examples</a>
+        <div class="eyebrow">GEOMAN FREE + GEOEDITOR</div>
+        <h1>See what you snap to.</h1>
+        <p class="intro">
+          Draw or move a vertex near an existing line. Inspect the exact feature
+          and vertex or segment selected by snapping.
+        </p>
+        <ol class="instructions">
+          <li>
+            <strong>Draw a line.</strong> Start near a labeled node, then
+            double-click elsewhere to finish.
+          </li>
+          <li>
+            <strong>Try a segment.</strong> Move near the middle of a blue line.
+          </li>
+          <li>
+            <strong>Edit a vertex.</strong> Choose Edit, then drag an endpoint
+            toward another line.
+          </li>
+        </ol>
+        <div class="actions">
+          <button id="draw" disabled>Draw line</button>
+          <button id="edit" disabled>Edit vertices</button>
+          <button id="reset" disabled>Reset demo</button>
+        </div>
+        <section class="target-card" aria-labelledby="target-title">
+          <div class="card-heading">
+            <h2 id="target-title">Live snap target</h2>
+            <span id="status" class="badge" role="status">Loading</span>
+          </div>
+          <p id="empty">Preparing the drawing tools…</p>
+          <dl id="target-details" hidden>
+            <div>
+              <dt>Feature</dt>
+              <dd id="feature-id"></dd>
+            </div>
+            <div>
+              <dt>OSM way</dt>
+              <dd id="way-id"></dd>
+            </div>
+            <div>
+              <dt>Way version</dt>
+              <dd id="way-version"></dd>
+            </div>
+            <div>
+              <dt id="node-label">Node</dt>
+              <dd id="node-id"></dd>
+            </div>
+            <div>
+              <dt>Coordinate</dt>
+              <dd id="coordinate"></dd>
+            </div>
+          </dl>
+          <details id="payload-details">
+            <summary>Last event payload</summary>
+            <pre id="payload">No snap event yet.</pre>
+          </details>
+        </section>
+        <section class="activity" aria-labelledby="activity-title">
+          <h2 id="activity-title">Recent activity</h2>
+          <ul id="activity">
+            <li>Loading sample ways…</li>
+          </ul>
+        </section>
+        <p class="note">
+          New vertices receive local IDs; moving or deleting a vertex keeps the
+          remaining node IDs aligned. Snap events are previews. The sample IDs
+          and versions travel with the target metadata; this demo does not merge
+          OSM nodes or upload changesets.
+        </p>
+      </aside>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

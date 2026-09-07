@@ -8,21 +8,19 @@
     <!-- MapLibre GL CSS and JS -->
     <link
       rel="stylesheet"
-      href="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css"
+      href="https://unpkg.com/maplibre-gl@6.7.0/dist/maplibre-gl.css"
     />
-    <script src="https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.js"></script>
 
     <!-- Geoman CSS and JS -->
     <link
       rel="stylesheet"
-      href="https://unpkg.com/@geoman-io/maplibre-geoman-free@0.6.1/dist/maplibre-geoman.css"
+      href="https://unpkg.com/@geoman-io/maplibre-geoman-free@0.9.1/dist/maplibre-geoman.css"
     />
-    <script src="https://unpkg.com/@geoman-io/maplibre-geoman-free@0.6.1/dist/maplibre-geoman.umd.js"></script>
 
-    <!-- GeoEditor CSS -->
+    <!-- Built GeoEditor CSS (run npm run build first) -->
     <link
       rel="stylesheet"
-      href="https://unpkg.com/maplibre-gl-geo-editor@0.1.0/dist/maplibre-gl-geo-editor.css"
+      href="../../dist/maplibre-gl-geo-editor.css"
     />
 
     <style>
@@ -122,13 +120,21 @@
       </ul>
     </div>
 
+    <script type="importmap">
+      { "imports": {
+        "maplibre-gl": "https://unpkg.com/maplibre-gl@6.7.0/dist/maplibre-gl.mjs",
+        "@geoman-io/maplibre-geoman-free": "https://unpkg.com/@geoman-io/maplibre-geoman-free@0.9.1/dist/maplibre-geoman.es.js"
+      } }
+    </script>
     <script type="module">
-      // Import GeoEditor from CDN (pinned version)
-      import { GeoEditor } from "https://unpkg.com/maplibre-gl-geo-editor@0.1.0/dist/index.mjs";
+      import * as maplibregl from "maplibre-gl";
+      import { Geoman } from "@geoman-io/maplibre-geoman-free";
+      // Run npm run build first; load this checkout with CDN-hosted dependencies.
+      import { GeoEditor } from "../../dist/index.mjs";
 
       console.log("GeoEditor imported:", GeoEditor);
 
-      // Create the map (maplibregl is available globally)
+      // Create the map
       const map = new maplibregl.Map({
         container: "map",
         style: {
@@ -156,10 +162,10 @@
       // Wait for map to load
       map.on("load", () => {
         console.log("Map loaded");
-        console.log("Geoman global:", typeof Geoman, Geoman);
+        console.log("Geoman constructor:", typeof Geoman, Geoman);
 
-        // Initialize Geoman (available globally as Geoman.Geoman)
-        const geoman = new Geoman.Geoman(map, {});
+        // Initialize Geoman
+        const geoman = new Geoman(map, {});
         console.log("Geoman instance created:", geoman);
 
         // Wait for Geoman to load

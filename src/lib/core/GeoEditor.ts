@@ -38,7 +38,9 @@ import type {
   AttributeFieldDefinition,
   AttributeSchema,
   AttributeChangeEvent,
+  SnapEvent,
 } from "./types";
+import { observeSnapping } from "./snapEvents";
 import { HistoryManager } from "./HistoryManager";
 import { resolveImportedCount, type GeomanImportResult } from "./importResult";
 import {
@@ -80,6 +82,10 @@ import { isPolygon, isLine } from "../utils/geometryUtils";
 export class GeoEditor implements IControl {
   private map!: MapLibreMap;
   private geoman: GeomanInstance | null = null;
+  private observedSnappingHelper: unknown = null;
+  private detachSnapObserver: (() => void) | null = null;
+  private currentSnap: SnapEvent | null = null;
+  private snapObserverRemoved = false;
   private container!: HTMLDivElement;
   private options: GeoEditorOptionsRequired;
   private state: GeoEditorState;
@@ -230,6 +236,7 @@ export class GeoEditor implements IControl {
    * Called when the control is added to the map
    */
   onAdd(map: MapLibreMap): HTMLElement {
+    this.snapObserverRemoved = false;
     this.map = map;
 
     // Initialize feature handlers with map
@@ -281,6 +288,8 @@ export class GeoEditor implements IControl {
    * Called when the control is removed from the map
    */
   onRemove(): void {
+    this.snapObserverRemoved = true;
+    this.clearSnapObserver();
     this.removeKeyboardShortcuts();
     this.removeSelectionHandler();
     this.removeScaleHandler();
@@ -321,9 +330,12 @@ export class GeoEditor implements IControl {
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setGeoman(geoman: any): void {
+    if (this.geoman === geoman) return;
+    this.clearSnapObserver();
     this.geoman = geoman;
     this.setupGeomanEvents();
     this.applySnappingState();
+    this.refreshSnapObserver();
 
     // Hide geoman control if option is set
     if (this.options.hideGeomanControl) {
@@ -349,7 +361,7 @@ export class GeoEditor implements IControl {
           // Also override removeControls to a no-op since addControls was
           // never called — calling removeControls would try to detach events
           // that were never attached, causing console warnings.
-          geoman.removeControls = () => {};
+          geoman.removeControls = async () => {};
           this.setGeoman(geoman);
         }
       })
@@ -3928,6 +3940,7 @@ export class GeoEditor implements IControl {
   }
 
   private applySnappingState(): void {
+    if (!this.snappingEnabled) this.updateSnap(null);
     if (!this.geoman) {
       return;
     }
@@ -4336,13 +4349,19 @@ export class GeoEditor implements IControl {
   private setupGeomanEvents(): void {
     if (!this.geoman) return;
 
+    this.refreshSnapObserver();
+    const observedGeoman = this.geoman;
+
     this.geoman.setGlobalEventsListener((event) => {
+      if (this.snapObserverRemoved || this.geoman !== observedGeoman) return;
+      this.refreshSnapObserver();
       const eventName =
         (event as { name?: string; type?: string }).name ?? event.type ?? "";
       const eventFeature = this.extractFeatureFromEvent(
         (event as { feature?: unknown }).feature,
       );
       const eventAction = (event as { action?: string }).action ?? "";
+      if (eventAction === "mode_end") this.updateSnap(null);
 
       // Handle feature creation
       if (
@@ -4444,6 +4463,75 @@ export class GeoEditor implements IControl {
   private emitEvent(type: string, detail: unknown): void {
     const event = new CustomEvent(type, { detail });
     this.map.getContainer().dispatchEvent(event);
+  }
+
+  /** Latest snap preview, copied for the caller. Not a committed topology edit. */
+  getSnapTarget(): SnapEvent | null {
+    return this.currentSnap
+      ? JSON.parse(JSON.stringify(this.currentSnap))
+      : null;
+  }
+
+  /** Whether the currently active Geoman snapping helper can be observed. */
+  isSnapTrackingAvailable(): boolean {
+    return this.detachSnapObserver !== null;
+  }
+
+  private updateSnap(event: SnapEvent | null): void {
+    const previous = this.currentSnap;
+    const key = (snap: SnapEvent) => {
+      const target = snap.target;
+      return target.kind === "custom"
+        ? JSON.stringify(["custom", snap.coordinate])
+        : JSON.stringify([
+            target.kind,
+            target.featureId,
+            target.temporary,
+            target.kind === "vertex"
+              ? target.coordinatePath
+              : target.segmentPaths,
+          ]);
+    };
+    this.currentSnap = event;
+    if (previous && (!event || key(previous) !== key(event))) {
+      this.options.onUnsnap?.(JSON.parse(JSON.stringify(previous)));
+      if (this.map) {
+        this.emitEvent("gm:unsnap", JSON.parse(JSON.stringify(previous)));
+      }
+    }
+    if (event) {
+      this.options.onSnap?.(this.getSnapTarget()!);
+      if (this.map) this.emitEvent("gm:snap", this.getSnapTarget());
+    }
+  }
+
+  private clearSnapObserver(): void {
+    this.detachSnapObserver?.();
+    this.detachSnapObserver = null;
+    this.observedSnappingHelper = null;
+    this.updateSnap(null);
+  }
+
+  private refreshSnapObserver(): void {
+    if (
+      this.snapObserverRemoved ||
+      !this.map ||
+      !this.options.snapEventsEnabled
+    ) {
+      return;
+    }
+    const helper =
+      (
+        this.geoman as unknown as {
+          actionInstances?: { helper__snapping?: unknown };
+        } | null
+      )?.actionInstances?.helper__snapping ?? null;
+    if (helper === this.observedSnappingHelper) return;
+    this.clearSnapObserver();
+    this.observedSnappingHelper = helper;
+    this.detachSnapObserver = observeSnapping(helper, (event) =>
+      this.updateSnap(event),
+    );
   }
 
   // ============================================================================

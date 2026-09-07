@@ -30,12 +30,12 @@ export function GeoEditorReact({
     const control = new GeoEditor({ ...options, position });
     controlRef.current = control;
 
-    map.addControl(control, position);
-
     // Set geoman instance if provided
     if (geoman) {
       control.setGeoman(geoman);
     }
+
+    map.addControl(control, position);
 
     // Cleanup on unmount
     return () => {

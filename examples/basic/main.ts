@@ -2,9 +2,13 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@geoman-io/maplibre-geoman-free/dist/maplibre-geoman.css";
 import "../../src/lib/styles/geo-editor.css";
 
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { Geoman } from "@geoman-io/maplibre-geoman-free";
 import { GeoEditor } from "../../src/lib/core/GeoEditor";
+
+// MapLibre 6 needs an explicit bundled worker URL in Vite.
+maplibregl.setWorkerUrl(workerUrl);
 
 // Create the map
 const map = new maplibregl.Map({

@@ -68,8 +68,8 @@
     "url": "https://github.com/opengeos/maplibre-gl-geo-editor.git"
   },
   "peerDependencies": {
-    "@geoman-io/maplibre-geoman-free": ">=0.5.0",
-    "maplibre-gl": ">=3.0.0",
+    "@geoman-io/maplibre-geoman-free": ">=0.9.1 <0.10.0",
+    "maplibre-gl": ">=6.0.0 <7.0.0",
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0"
   },
@@ -78,7 +78,7 @@
     "maplibre-gl-layer-control": "^0.13.0"
   },
   "devDependencies": {
-    "@geoman-io/maplibre-geoman-free": "^0.6.2",
+    "@geoman-io/maplibre-geoman-free": "^0.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/geojson": "^7946.0.16",
@@ -92,7 +92,7 @@
     "@vitest/ui": "^4.0.18",
     "eslint": "^9.0.0",
     "jsdom": "^28.0.0",
-    "maplibre-gl": "^5.17.0",
+    "maplibre-gl": "^6.7.0",
     "prettier": "^3.8.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

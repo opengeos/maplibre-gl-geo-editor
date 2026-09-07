@@ -34,6 +34,8 @@ export type {
   GeomanFeaturesAPI,
   GeoEditorEventMap,
   GeoEditorEventType,
+  SnapEvent,
+  SnapTarget,
   // History types
   HistoryOperationType,
   Command,
