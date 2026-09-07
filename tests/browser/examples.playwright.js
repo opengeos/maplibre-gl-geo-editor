@@ -4,10 +4,11 @@ async (page) => {
   const workers = [];
   const pageError = (error) => errors.push(error.message);
   const consoleError = (message) => {
-    if (
-      message.type() === "error" &&
-      !message.text().includes("404 (Not Found)")
-    )
+    // The examples ship no favicon; every other missing asset is a real error.
+    const faviconMiss =
+      message.location().url.endsWith("/favicon.ico") &&
+      message.text().includes("404 (Not Found)");
+    if (message.type() === "error" && !faviconMiss)
       errors.push(message.text());
   };
   const response = (response) => {

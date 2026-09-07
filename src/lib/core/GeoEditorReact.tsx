@@ -1,8 +1,15 @@
-import { useEffect, useRef, useCallback } from 'react';
-import type { Map as MapLibreMap } from 'maplibre-gl';
-import { GeoEditor } from './GeoEditor';
-import type { Feature, FeatureCollection } from 'geojson';
-import type { GeoEditorOptions, GeomanInstance, DrawMode, EditMode, GeoJsonLoadResult, GeoJsonSaveResult } from './types';
+import { useEffect, useRef, useCallback } from "react";
+import type { Map as MapLibreMap } from "maplibre-gl";
+import { GeoEditor } from "./GeoEditor";
+import type { Feature, FeatureCollection } from "geojson";
+import type {
+  GeoEditorOptions,
+  GeomanInstance,
+  DrawMode,
+  EditMode,
+  GeoJsonLoadResult,
+  GeoJsonSaveResult,
+} from "./types";
 
 export interface GeoEditorReactProps extends GeoEditorOptions {
   /** MapLibre map instance */
@@ -18,7 +25,7 @@ export interface GeoEditorReactProps extends GeoEditorOptions {
 export function GeoEditorReact({
   map,
   geoman,
-  position = 'top-left',
+  position = "top-left",
   ...options
 }: GeoEditorReactProps) {
   const controlRef = useRef<GeoEditor | null>(null);
@@ -30,12 +37,12 @@ export function GeoEditorReact({
     const control = new GeoEditor({ ...options, position });
     controlRef.current = control;
 
-    // Set geoman instance if provided
+    map.addControl(control, position);
+
+    // Set geoman instance if provided (after onAdd, so the control is ready)
     if (geoman) {
       control.setGeoman(geoman);
     }
-
-    map.addControl(control, position);
 
     // Cleanup on unmount
     return () => {
@@ -62,7 +69,7 @@ export function GeoEditorReact({
  */
 export function useGeoEditor(
   map: MapLibreMap | null,
-  options: GeoEditorOptions = {}
+  options: GeoEditorOptions = {},
 ): {
   control: GeoEditor | null;
   enableDrawMode: (mode: DrawMode) => void;
@@ -75,7 +82,7 @@ export function useGeoEditor(
   openFileDialog: () => void;
   loadGeoJson: (
     geoJson: FeatureCollection | Feature,
-    filename?: string
+    filename?: string,
   ) => Promise<GeoJsonLoadResult> | undefined;
   saveGeoJson: (filename?: string) => GeoJsonSaveResult | undefined;
 } {
@@ -86,7 +93,7 @@ export function useGeoEditor(
 
     const control = new GeoEditor(options);
     controlRef.current = control;
-    map.addControl(control, options.position || 'top-left');
+    map.addControl(control, options.position || "top-left");
 
     return () => {
       if (controlRef.current) {
@@ -128,9 +135,12 @@ export function useGeoEditor(
     controlRef.current?.openFileDialog();
   }, []);
 
-  const loadGeoJson = useCallback((geoJson: FeatureCollection | Feature, filename?: string) => {
-    return controlRef.current?.loadGeoJson(geoJson, filename);
-  }, []);
+  const loadGeoJson = useCallback(
+    (geoJson: FeatureCollection | Feature, filename?: string) => {
+      return controlRef.current?.loadGeoJson(geoJson, filename);
+    },
+    [],
+  );
 
   const saveGeoJson = useCallback((filename?: string) => {
     return controlRef.current?.saveGeoJson(filename);

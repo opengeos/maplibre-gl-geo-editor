@@ -227,6 +227,29 @@ describe("GeoEditor snap events", () => {
     expect(editor.isSnapTrackingAvailable()).toBe(false);
   });
 
+  it("detaches while snapping is disabled and reattaches when re-enabled", () => {
+    const onSnap = vi.fn();
+    const editor = new GeoEditor({ snapEventsEnabled: true, onSnap });
+    const internal = editor as any;
+    internal.map = { getContainer: () => document.createElement("div") };
+    const { helper, detach } = fixture([feature("way/4", line())]);
+    detach();
+    internal.geoman = { actionInstances: { helper__snapping: helper } };
+    internal.refreshSnapObserver();
+    expect(editor.isSnapTrackingAvailable()).toBe(true);
+
+    editor.setSnapping(false);
+    expect(editor.isSnapTrackingAvailable()).toBe(false);
+    expect(Object.hasOwn(helper, "getSnappedLngLat")).toBe(false);
+    helper.getSnappedLngLat([0.5, 0], [0.5, 0]);
+    expect(onSnap).not.toHaveBeenCalled();
+
+    editor.setSnapping(true);
+    expect(editor.isSnapTrackingAvailable()).toBe(true);
+    helper.getSnappedLngLat([0.5, 0], [0.5, 0]);
+    expect(onSnap).toHaveBeenCalledOnce();
+  });
+
   it("does not patch Geoman unless explicitly enabled", () => {
     const editor = new GeoEditor() as any;
     const { helper, detach } = fixture([]);

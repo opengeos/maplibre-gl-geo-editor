@@ -178,7 +178,7 @@ function describeTarget(
   const feature = winner.feature.getGeoJson?.() ?? winner.feature.geoJson;
   if (!feature) return null;
   // Snapshot properties/geometry so future edits cannot change an emitted target.
-  const snapshot = JSON.parse(JSON.stringify(feature)) as Feature;
+  const snapshot = structuredClone(feature) as Feature;
   const base = {
     featureId: winner.feature.id,
     feature: snapshot,

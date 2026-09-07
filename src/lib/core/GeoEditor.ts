@@ -335,7 +335,6 @@ export class GeoEditor implements IControl {
     this.geoman = geoman;
     this.setupGeomanEvents();
     this.applySnappingState();
-    this.refreshSnapObserver();
 
     // Hide geoman control if option is set
     if (this.options.hideGeomanControl) {
@@ -3940,7 +3939,15 @@ export class GeoEditor implements IControl {
   }
 
   private applySnappingState(): void {
-    if (!this.snappingEnabled) this.updateSnap(null);
+    // Snapping off means no snap target can be produced, so stop observing the
+    // helper entirely rather than only dropping the current target.
+    if (!this.snappingEnabled) this.clearSnapObserver();
+    this.applyGeomanSnappingMode();
+    // Enabling snapping is what creates the helper, so attach after the toggle.
+    if (this.snappingEnabled) this.refreshSnapObserver();
+  }
+
+  private applyGeomanSnappingMode(): void {
     if (!this.geoman) {
       return;
     }
@@ -4467,9 +4474,7 @@ export class GeoEditor implements IControl {
 
   /** Latest snap preview, copied for the caller. Not a committed topology edit. */
   getSnapTarget(): SnapEvent | null {
-    return this.currentSnap
-      ? JSON.parse(JSON.stringify(this.currentSnap))
-      : null;
+    return this.currentSnap ? structuredClone(this.currentSnap) : null;
   }
 
   /** Whether the currently active Geoman snapping helper can be observed. */
@@ -4494,14 +4499,14 @@ export class GeoEditor implements IControl {
     };
     this.currentSnap = event;
     if (previous && (!event || key(previous) !== key(event))) {
-      this.options.onUnsnap?.(JSON.parse(JSON.stringify(previous)));
-      if (this.map) {
-        this.emitEvent("gm:unsnap", JSON.parse(JSON.stringify(previous)));
-      }
+      const detail = structuredClone(previous);
+      this.options.onUnsnap?.(detail);
+      if (this.map) this.emitEvent("gm:unsnap", detail);
     }
     if (event) {
-      this.options.onSnap?.(this.getSnapTarget()!);
-      if (this.map) this.emitEvent("gm:snap", this.getSnapTarget());
+      const detail = structuredClone(event);
+      this.options.onSnap?.(detail);
+      if (this.map) this.emitEvent("gm:snap", detail);
     }
   }
 
@@ -4516,7 +4521,8 @@ export class GeoEditor implements IControl {
     if (
       this.snapObserverRemoved ||
       !this.map ||
-      !this.options.snapEventsEnabled
+      !this.options.snapEventsEnabled ||
+      !this.snappingEnabled
     ) {
       return;
     }

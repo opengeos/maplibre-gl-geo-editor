@@ -176,6 +176,8 @@ async (page) => {
     featureCount: window.snapTest.gm.features.exportGeoJson().features.length,
   }));
   check(result.errors.length === 0, JSON.stringify(result.errors));
+  check(result.snapEvents > 0, "Missing snap event");
+  check(result.unsnapEvents > 0, "Missing unsnap event");
   await page.screenshot({ path: ".playwright-cli/snapping-verified.png" });
   return {
     passed: [
