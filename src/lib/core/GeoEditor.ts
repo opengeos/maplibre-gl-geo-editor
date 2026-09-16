@@ -1,13 +1,10 @@
 import type {
   IControl,
+  LngLat,
   Map as MapLibreMap,
   MapMouseEvent,
   GeoJSONSource,
 } from "maplibre-gl";
-// Named imports, not a default one: MapLibre v6 is ESM-only and dropped its
-// default export. `Popup`/`LngLat` are classes, so they serve as both values
-// and types.
-import { LngLat, Popup } from "maplibre-gl";
 import type {
   Feature,
   FeatureCollection,
@@ -20,6 +17,7 @@ import type {
 import * as turf from "@turf/turf";
 import type {
   GeoEditorOptions,
+  GeoEditorPopup,
   GeoEditorOptionsRequired,
   GeoEditorState,
   DrawMode,
@@ -162,11 +160,11 @@ export class GeoEditor implements IControl {
   // Hidden file input for file dialog
   private fileInput: HTMLInputElement | null = null;
 
-  // Feature properties popup
-  private propertiesPopup: Popup | null = null;
+  // Feature properties popup (built by `options.createPopup`)
+  private propertiesPopup: GeoEditorPopup | null = null;
 
-  // Numerical-rotation popup
-  private rotatePopup: Popup | null = null;
+  // Numerical-rotation popup (built by `options.createPopup`)
+  private rotatePopup: GeoEditorPopup | null = null;
 
   // History management (undo/redo)
   private historyManager: HistoryManager | null = null;
@@ -920,12 +918,13 @@ export class GeoEditor implements IControl {
       }
     });
 
-    this.rotatePopup = new Popup({
-      maxWidth: "240px",
-      closeButton: false,
-      closeOnClick: false,
-      className: `${CSS_PREFIX}-rotate-popup`,
-    })
+    this.rotatePopup = this.options
+      .createPopup({
+        maxWidth: "240px",
+        closeButton: false,
+        closeOnClick: false,
+        className: `${CSS_PREFIX}-rotate-popup`,
+      })
       .setLngLat(lngLat)
       .setDOMContent(form)
       .addTo(this.map);
@@ -2042,12 +2041,13 @@ export class GeoEditor implements IControl {
     const html = this.formatPropertiesHtml(feature.properties);
 
     // Create popup
-    this.propertiesPopup = new Popup({
-      maxWidth: "300px",
-      closeButton: true,
-      closeOnClick: false,
-      className: "geo-editor-properties-popup",
-    })
+    this.propertiesPopup = this.options
+      .createPopup({
+        maxWidth: "300px",
+        closeButton: true,
+        closeOnClick: false,
+        className: "geo-editor-properties-popup",
+      })
       .setLngLat(coordinates)
       .setHTML(html)
       .addTo(this.map);

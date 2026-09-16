@@ -438,6 +438,7 @@ function App() {
 | `attributePanelSideOffset` | `number` | `10` | Offset from left/right side of map container in pixels |
 | `attributePanelTitle` | `string` | `'Feature Properties'` | Title of the attribute panel |
 | `onAttributeChange` | `(event) => void` | - | Callback when feature attributes change |
+| `createPopup` | `(options) => GeoEditorPopup` | MapLibre `Popup` | Builds the rotate and feature-properties popups; pass another engine's popup class (for example mapbox-gl's) when the editor runs on a non-MapLibre map |
 | `enableHistory` | `boolean` | `true` | Enable undo/redo functionality |
 | `maxHistorySize` | `number` | `50` | Maximum number of history entries |
 | `onHistoryChange` | `(canUndo, canRedo) => void` | - | Callback when history state changes |

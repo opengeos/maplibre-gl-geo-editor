@@ -1,11 +1,13 @@
 // Core exports
-export { GeoEditor } from './lib/core/GeoEditor';
-export { HistoryManager } from './lib/core/HistoryManager';
+export { GeoEditor } from "./lib/core/GeoEditor";
+export { HistoryManager } from "./lib/core/HistoryManager";
 
 // Adapter export
-export { GeoEditorLayerAdapter } from './lib/adapters/GeoEditorLayerAdapter';
+export { GeoEditorLayerAdapter } from "./lib/adapters/GeoEditorLayerAdapter";
 export type {
   GeoEditorOptions,
+  GeoEditorPopup,
+  GeoEditorPopupOptions,
   GeoEditorState,
   DrawMode,
   EditMode,
@@ -45,7 +47,7 @@ export type {
   AttributeFieldDefinition,
   AttributeSchema,
   AttributeChangeEvent,
-} from './lib/core/types';
+} from "./lib/core/types";
 
 // Feature exports
 export {
@@ -56,10 +58,10 @@ export {
   ScaleFeature,
   LassoFeature,
   SplitFeature,
-} from './lib/features';
+} from "./lib/features";
 
 // Utility exports
-export * from './lib/utils';
+export * from "./lib/utils";
 
 // Constants
 export {
@@ -69,7 +71,7 @@ export {
   DEFAULT_FILE_MODES,
   DEFAULT_OPTIONS,
   CSS_PREFIX,
-} from './lib/core/constants';
+} from "./lib/core/constants";
 
 // Import CSS (for bundlers that support it)
-import './lib/styles/geo-editor.css';
+import "./lib/styles/geo-editor.css";

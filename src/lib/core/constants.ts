@@ -1,3 +1,5 @@
+// A named import: MapLibre v6 is ESM-only and has no default export.
+import { Popup } from "maplibre-gl";
 import type {
   GeoEditorOptionsRequired,
   DrawMode,
@@ -111,6 +113,7 @@ export const DEFAULT_OPTIONS: GeoEditorOptionsRequired = {
   attributePanelTop: 10,
   attributePanelSideOffset: 10,
   attributePanelTitle: "Feature Properties",
+  createPopup: (options) => new Popup(options),
 };
 
 /**
