@@ -12,11 +12,7 @@ import type {
   Geometry,
 } from "geojson";
 import type { GeomanImportResult } from "./importResult";
-import type {
-  Map as MapLibreMap,
-  MapMouseEvent,
-  MapTouchEvent,
-} from "maplibre-gl";
+import type { MapMouseEvent, MapTouchEvent } from "maplibre-gl";
 
 // ============================================================================
 // Draw and Edit Mode Types
@@ -178,12 +174,15 @@ export interface GeoEditorPopupOptions {
 /**
  * The popup surface the editor drives, a structural subset of MapLibre's
  * (and mapbox-gl's) `Popup` so either engine's class satisfies it as is.
+ * `addTo` takes the editor's map as an opaque object rather than a MapLibre
+ * `Map`, so a popup typed against another engine's map implements this
+ * without a cast.
  */
 export interface GeoEditorPopup {
   setLngLat(lngLat: [number, number] | { lng: number; lat: number }): this;
   setDOMContent(node: Node): this;
   setHTML(html: string): this;
-  addTo(map: MapLibreMap): this;
+  addTo(map: object): this;
   remove(): this;
 }
 
