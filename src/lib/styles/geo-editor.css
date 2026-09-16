@@ -513,7 +513,8 @@
    Feature Properties Popup
    ============================================================================ */
 
-.geo-editor-properties-popup .maplibregl-popup-content {
+.geo-editor-properties-popup .maplibregl-popup-content,
+.geo-editor-properties-popup .mapboxgl-popup-content {
   padding: 10px;
   max-height: 300px;
   overflow-y: auto;
@@ -557,7 +558,8 @@
    Numerical Rotation Popup
    ============================================================================ */
 
-.geo-editor-rotate-popup .maplibregl-popup-content {
+.geo-editor-rotate-popup .maplibregl-popup-content,
+.geo-editor-rotate-popup .mapboxgl-popup-content {
   padding: 10px;
 }
 
