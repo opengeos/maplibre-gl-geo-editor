@@ -4185,10 +4185,13 @@ export class GeoEditor implements IControl {
   private setupKeyboardShortcuts(): void {
     this.boundKeyHandler = (e: KeyboardEvent) => {
       // Check whether the event target is an input, textarea, or other editable content.
+      // A field inside a shadow root reaches `document` retargeted to its host,
+      // so look at the first node of the composed path instead of `e.target`.
+      const target = e.composedPath()[0] ?? e.target;
       const isInputField =
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target instanceof HTMLElement && e.target.isContentEditable);
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
 
       // Text fields keep their own shortcuts (copy, paste, undo, Escape, ...).
       // The listener is on `document`, so without this it would take them away

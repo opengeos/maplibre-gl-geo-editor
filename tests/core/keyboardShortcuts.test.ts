@@ -24,6 +24,7 @@ function makeEditor() {
   return { anyEditor, spies };
 }
 
+/** Dispatch a bubbling, cancelable keydown on `target` and return the event. */
 function press(target: EventTarget, init: KeyboardEventInit): KeyboardEvent {
   const event = new KeyboardEvent("keydown", {
     bubbles: true,
@@ -78,6 +79,19 @@ describe("keyboard shortcuts and text fields (#50)", () => {
     document.body.appendChild(div);
 
     const event = press(div, { key: "v", ctrlKey: true });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(current.spies.pasteFeatures).not.toHaveBeenCalled();
+  });
+
+  it("leaves Ctrl+V alone in an input inside a shadow root", () => {
+    current = makeEditor();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const input = document.createElement("input");
+    host.attachShadow({ mode: "open" }).appendChild(input);
+
+    const event = press(input, { key: "v", ctrlKey: true, composed: true });
 
     expect(event.defaultPrevented).toBe(false);
     expect(current.spies.pasteFeatures).not.toHaveBeenCalled();
