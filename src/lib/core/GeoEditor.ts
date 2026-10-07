@@ -4190,6 +4190,11 @@ export class GeoEditor implements IControl {
         e.target instanceof HTMLTextAreaElement ||
         (e.target instanceof HTMLElement && e.target.isContentEditable);
 
+      // Text fields keep their own shortcuts (copy, paste, undo, Escape, ...).
+      // The listener is on `document`, so without this it would take them away
+      // from every text field on the page while the control is on the map.
+      if (isInputField) return;
+
       // Ctrl/Cmd + Z - Undo
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
         this.undo();
@@ -4220,7 +4225,6 @@ export class GeoEditor implements IControl {
       // Delete
       if (
         (e.key === "Delete" || e.key === "Backspace") &&
-        !isInputField &&
         !(
           e.target instanceof Element &&
           e.target.closest(`.${CSS_PREFIX}-attribute-panel`)
